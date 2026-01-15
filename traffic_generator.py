@@ -258,8 +258,8 @@ def run_traffic_tests():
         """)
 
         # Test blocked sites
-        print(f"\n{YELLOW}>>> Testing blocked websites{RESET}\n")
-        LOG_FILE.write("\n>>> Testing blocked websites\n\n")
+        print(f"\n{YELLOW}>>> Testing Application Control Blocked Sites{RESET}\n")
+        LOG_FILE.write("\n>>> Testing Application Control Blocked Sites\n\n")
         for url in config['web_requests']['blocked']:
             result = web_request_test(url, context)
             stats['web']['pass' if result else 'fail'] += 1
