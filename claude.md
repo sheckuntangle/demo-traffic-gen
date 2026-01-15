@@ -78,3 +78,16 @@ The script provides color-coded output:
 - Additional details (response codes, error messages)
 
 Summary statistics are displayed at the end showing total passes/fails per category.
+
+### Log Files
+
+A timestamped log file is automatically created for each run (format: `traffic_generator_YYYYMMDD_HHMMSS.log`). The log file contains:
+- All test results without color codes
+- Section headers marking different test phases
+- Summary statistics
+- Error messages if any
+
+Log files are saved in the current working directory and can be used for:
+- Long-term archival of test results
+- Analysis and comparison of different runs
+- Integration with other reporting tools

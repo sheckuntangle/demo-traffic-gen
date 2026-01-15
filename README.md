@@ -43,4 +43,6 @@ Edit `config.json` to modify:
 
 Real-time color-coded results showing pass/fail status for each test, with summary statistics at the end.
 
+A timestamped log file (e.g., `traffic_generator_20260115_143022.log`) is automatically created in the current directory, containing all test results without color codes for easy archival and analysis.
+
 See `claude.md` for detailed documentation.
