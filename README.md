@@ -21,8 +21,10 @@ This script generates various types of network traffic to simulate realistic fir
 
 - **Ping Tests**: Tests connectivity to major DNS servers
 - **DNS Queries**: Performs DNS lookups on both blocked and allowed domains
-- **Web Requests**: Uses headless Chromium browser to visit websites (realistic traffic)
+- **Web Requests**: Uses headless Chromium browser with anti-detection features to visit websites (realistic traffic)
 - **Geo-IP Tests**: Attempts connections to IPs from France and China
+
+The script includes stealth features to bypass bot detection (realistic headers, automation masking, etc.).
 
 ## Files
 

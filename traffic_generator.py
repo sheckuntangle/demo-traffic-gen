@@ -89,10 +89,10 @@ def dns_query_test(domain):
         return False
 
 
-def web_request_test(url, browser, timeout=30):
+def web_request_test(url, context, timeout=30):
     """Test web request using Playwright."""
     try:
-        page = browser.new_page()
+        page = context.new_page()
 
         # Add random delay to simulate human behavior
         time.sleep(random.uniform(1, 3))
@@ -119,11 +119,11 @@ def web_request_test(url, browser, timeout=30):
         return False
 
 
-def http_request_to_ip(ip, description, browser, timeout=15):
+def http_request_to_ip(ip, description, context, timeout=15):
     """Test HTTP request to an IP address."""
     url = f"http://{ip}"
     try:
-        page = browser.new_page()
+        page = context.new_page()
         response = page.goto(url, timeout=timeout * 1000, wait_until='domcontentloaded')
 
         if response and response.status < 400:
@@ -204,14 +204,64 @@ def run_traffic_tests():
     LOG_FILE.write("\n>>> Starting web request tests with Playwright\n\n")
 
     with sync_playwright() as p:
-        # Launch browser in headless mode
-        browser = p.chromium.launch(headless=True)
+        # Launch browser in headless mode with anti-detection features
+        browser = p.chromium.launch(
+            headless=True,
+            args=[
+                '--disable-blink-features=AutomationControlled',
+                '--disable-dev-shm-usage',
+                '--no-sandbox',
+                '--disable-setuid-sandbox',
+                '--disable-web-security',
+                '--disable-features=IsolateOrigins,site-per-process'
+            ]
+        )
+
+        # Create browser context with realistic settings
+        context = browser.new_context(
+            viewport={'width': 1920, 'height': 1080},
+            user_agent='Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
+            locale='en-US',
+            timezone_id='America/New_York',
+            extra_http_headers={
+                'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8',
+                'Accept-Language': 'en-US,en;q=0.9',
+                'Accept-Encoding': 'gzip, deflate, br',
+                'DNT': '1',
+                'Connection': 'keep-alive',
+                'Upgrade-Insecure-Requests': '1',
+                'Sec-Fetch-Dest': 'document',
+                'Sec-Fetch-Mode': 'navigate',
+                'Sec-Fetch-Site': 'none',
+                'Sec-Fetch-User': '?1',
+                'Cache-Control': 'max-age=0'
+            }
+        )
+
+        # Add JavaScript to mask automation
+        context.add_init_script("""
+            Object.defineProperty(navigator, 'webdriver', {
+                get: () => undefined
+            });
+
+            window.navigator.chrome = {
+                runtime: {}
+            };
+
+            Object.defineProperty(navigator, 'plugins', {
+                get: () => [1, 2, 3, 4, 5]
+            });
+
+            Object.defineProperty(navigator, 'languages', {
+                get: () => ['en-US', 'en']
+            });
+        """)
 
         # Test blocked sites
         print(f"\n{YELLOW}>>> Testing blocked websites{RESET}\n")
         LOG_FILE.write("\n>>> Testing blocked websites\n\n")
         for url in config['web_requests']['blocked']:
-            result = web_request_test(url, browser)
+            result = web_request_test(url, context)
             stats['web']['pass' if result else 'fail'] += 1
             time.sleep(random.uniform(2, 5))
 
@@ -220,7 +270,7 @@ def run_traffic_tests():
         LOG_FILE.write("\n>>> Testing allowed websites\n\n")
         allowed_web_sample = random.sample(config['web_requests']['allowed'], min(20, len(config['web_requests']['allowed'])))
         for url in allowed_web_sample:
-            result = web_request_test(url, browser)
+            result = web_request_test(url, context)
             stats['web']['pass' if result else 'fail'] += 1
             time.sleep(random.uniform(2, 5))
 
@@ -234,7 +284,7 @@ def run_traffic_tests():
             time.sleep(random.uniform(1, 2))
 
             # HTTP test
-            result = http_request_to_ip(target['ip'], target['description'], browser)
+            result = http_request_to_ip(target['ip'], target['description'], context)
             stats['geoip']['pass' if result else 'fail'] += 1
             time.sleep(random.uniform(2, 4))
 
@@ -247,10 +297,11 @@ def run_traffic_tests():
             time.sleep(random.uniform(1, 2))
 
             # HTTP test
-            result = http_request_to_ip(target['ip'], target['description'], browser)
+            result = http_request_to_ip(target['ip'], target['description'], context)
             stats['geoip']['pass' if result else 'fail'] += 1
             time.sleep(random.uniform(2, 4))
 
+        context.close()
         browser.close()
 
     # Print summary statistics

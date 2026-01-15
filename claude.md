@@ -24,6 +24,7 @@ Python script using Playwright for realistic browser-based traffic generation.
 
 ## Features
 - Headless browser rendering for realistic traffic patterns
+- Anti-bot detection measures (stealth user agent, realistic headers, automation masking)
 - Real-time pass/fail logging for each request
 - Geographic diversity in target domains (30-40 sites from various countries)
 - Separate configuration file for easy updates
@@ -91,3 +92,26 @@ Log files are saved in the current working directory and can be used for:
 - Long-term archival of test results
 - Analysis and comparison of different runs
 - Integration with other reporting tools
+
+## Anti-Detection Features
+
+The script includes several techniques to avoid bot detection and bypass common anti-automation measures:
+
+### Browser Configuration
+- **Automation flags disabled**: Removes `navigator.webdriver` and automation-controlled features
+- **Realistic viewport**: 1920x1080 resolution
+- **Updated user agent**: Chrome 131 on Linux
+- **Locale/timezone**: en-US/America/New_York
+
+### HTTP Headers
+- Complete set of modern browser headers (Accept, Accept-Language, Accept-Encoding)
+- Security headers (Sec-Fetch-Dest, Sec-Fetch-Mode, Sec-Fetch-Site, Sec-Fetch-User)
+- Connection persistence and cache control
+
+### JavaScript Masking
+- Hides `navigator.webdriver` property
+- Adds `chrome.runtime` object
+- Simulates browser plugins
+- Sets realistic language preferences
+
+These features help bypass protection on sites like Bloomberg, Reuters, Salesforce, and StackOverflow that use sophisticated bot detection.
