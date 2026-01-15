@@ -1,0 +1,126 @@
+{
+  "dns_servers": {
+    "description": "DNS servers to ping",
+    "targets": [
+      {"name": "Quad9", "ip": "9.9.9.9"},
+      {"name": "Google DNS Primary", "ip": "8.8.8.8"},
+      {"name": "Google DNS Secondary", "ip": "8.8.4.4"},
+      {"name": "OpenDNS Primary", "ip": "208.67.222.222"},
+      {"name": "OpenDNS Secondary", "ip": "208.67.220.220"}
+    ]
+  },
+  "dns_queries": {
+    "blocked": [
+      "msn.com",
+      "yahoo.com"
+    ],
+    "allowed": [
+      "bbc.co.uk",
+      "cnn.com",
+      "wikipedia.org",
+      "github.com",
+      "stackoverflow.com",
+      "reddit.com",
+      "nytimes.com",
+      "theguardian.com",
+      "reuters.com",
+      "bloomberg.com",
+      "weather.com",
+      "espn.com",
+      "imdb.com",
+      "amazon.com",
+      "ebay.com",
+      "linkedin.com",
+      "microsoft.com",
+      "apple.com",
+      "adobe.com",
+      "netflix.com",
+      "spotify.com",
+      "twitch.tv",
+      "discord.com",
+      "slack.com",
+      "zoom.us",
+      "dropbox.com",
+      "salesforce.com",
+      "oracle.com",
+      "dell.com",
+      "hp.com",
+      "bbc.com",
+      "spiegel.de",
+      "lemonde.fr",
+      "elpais.com",
+      "corriere.it",
+      "asahi.com",
+      "smh.com.au",
+      "cbc.ca",
+      "timesofindia.com",
+      "globo.com"
+    ]
+  },
+  "web_requests": {
+    "blocked": [
+      "https://www.facebook.com",
+      "https://mail.google.com"
+    ],
+    "allowed": [
+      "https://www.bbc.co.uk",
+      "https://www.cnn.com",
+      "https://www.wikipedia.org",
+      "https://github.com",
+      "https://stackoverflow.com",
+      "https://www.reddit.com",
+      "https://www.nytimes.com",
+      "https://www.theguardian.com",
+      "https://www.reuters.com",
+      "https://www.bloomberg.com",
+      "https://www.weather.com",
+      "https://www.espn.com",
+      "https://www.imdb.com",
+      "https://www.amazon.com",
+      "https://www.ebay.com",
+      "https://www.linkedin.com",
+      "https://www.microsoft.com",
+      "https://www.apple.com",
+      "https://www.adobe.com",
+      "https://www.netflix.com",
+      "https://www.spotify.com",
+      "https://www.twitch.tv",
+      "https://www.discord.com",
+      "https://slack.com",
+      "https://zoom.us",
+      "https://www.dropbox.com",
+      "https://www.salesforce.com",
+      "https://www.oracle.com",
+      "https://www.dell.com",
+      "https://www.hp.com",
+      "https://www.bbc.com",
+      "https://www.spiegel.de",
+      "https://www.lemonde.fr",
+      "https://www.elpais.com",
+      "https://www.corriere.it",
+      "https://www.asahi.com",
+      "https://www.smh.com.au",
+      "https://www.cbc.ca",
+      "https://timesofindia.indiatimes.com",
+      "https://www.globo.com"
+    ]
+  },
+  "geoip_tests": {
+    "france": {
+      "description": "IPs that MaxMind classifies as France",
+      "targets": [
+        {"ip": "51.15.0.1", "description": "Scaleway France"},
+        {"ip": "163.172.0.1", "description": "Online SAS France"},
+        {"ip": "195.154.0.1", "description": "Online SAS France"}
+      ]
+    },
+    "china": {
+      "description": "IPs that MaxMind classifies as China",
+      "targets": [
+        {"ip": "202.108.22.5", "description": "China Telecom"},
+        {"ip": "61.135.169.125", "description": "China Unicom"},
+        {"ip": "123.125.114.144", "description": "Baidu China"}
+      ]
+    }
+  }
+}
