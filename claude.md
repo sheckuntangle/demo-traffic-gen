@@ -42,7 +42,7 @@ pip install playwright
 
 2. Install Playwright browsers:
 ```bash
-playwright install chromium
+python3 -m playwright install chromium
 ```
 
 ## Usage

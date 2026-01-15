@@ -9,7 +9,7 @@ Generate realistic network traffic to populate firewall reporting for demonstrat
 pip install -r requirements.txt
 
 # Install Playwright browsers
-playwright install chromium
+python3 -m playwright install chromium
 
 # Run the traffic generator
 python3 traffic_generator.py
