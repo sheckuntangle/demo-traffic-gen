@@ -202,6 +202,15 @@ const App = {
         }
     },
 
+    copyLog() {
+        const panel = document.getElementById("log-panel");
+        const text = panel.innerText;
+        navigator.clipboard.writeText(text).then(
+            () => this.showToast("Logs copied to clipboard"),
+            () => this.showToast("Failed to copy"),
+        );
+    },
+
     clearLog() {
         document.getElementById("log-panel").innerHTML = "";
         this.logCount = 0;
