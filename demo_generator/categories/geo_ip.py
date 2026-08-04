@@ -14,16 +14,20 @@ class GeoIp(TestCategory):
         results = []
 
         for country, country_config in cat_config.get("countries", {}).items():
+            expected = country_config.get("expected", "")
             for target in country_config.get("targets", []):
                 desc = f"{country.title()} - {target['description']}"
+                exp_tag = f"[expected: {expected}] " if expected else ""
 
                 result = await ping(target["ip"], desc, source_ip=source_ip)
                 result.category = self.name
+                result.message = exp_tag + result.message
                 results.append(result)
                 await _short_delay()
 
                 result = await http_to_ip(target["ip"], desc, context)
                 result.category = self.name
+                result.message = exp_tag + result.message
                 results.append(result)
                 await _long_delay()
 

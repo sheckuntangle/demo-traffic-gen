@@ -16,6 +16,9 @@ class DnsFilter(TestCategory):
         for target in cat_config.get("targets", []):
             result = await dns_query(target["domain"])
             result.category = self.name
+            expected = target.get("expected", "")
+            if expected:
+                result.message = f"[expected: {expected}] {result.message}"
             results.append(result)
             await _human_delay()
 

@@ -14,25 +14,35 @@ class DynamicBlocklist(TestCategory):
         results = []
 
         for target in cat_config.get("ip_targets", []):
+            expected = target.get("expected", "")
+            exp_tag = f"[expected: {expected}] " if expected else ""
+
             result = await ping(target["ip"], target.get("description", ""), source_ip=source_ip)
             result.category = self.name
+            result.message = exp_tag + result.message
             results.append(result)
             await _delay()
 
             result = await tcp_connect(target["ip"], 80)
             result.category = self.name
+            result.message = exp_tag + result.message
             results.append(result)
             await _delay()
 
         for target in cat_config.get("domain_targets", []):
+            expected = target.get("expected", "")
+            exp_tag = f"[expected: {expected}] " if expected else ""
+
             result = await dns_query(target["domain"])
             result.category = self.name
+            result.message = exp_tag + result.message
             results.append(result)
             await _delay()
 
             url = f"https://{target['domain']}"
             result = await web_request(url, context)
             result.category = self.name
+            result.message = exp_tag + result.message
             results.append(result)
             await _delay()
 

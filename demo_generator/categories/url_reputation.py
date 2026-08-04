@@ -16,6 +16,9 @@ class UrlReputation(TestCategory):
         for target in cat_config.get("targets", []):
             result = await web_request(target["url"], context)
             result.category = self.name
+            expected = target.get("expected", "")
+            if expected:
+                result.message = f"[expected: {expected}] {result.message}"
             results.append(result)
             await _delay()
 

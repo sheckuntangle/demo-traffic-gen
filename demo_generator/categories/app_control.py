@@ -16,12 +16,18 @@ class AppControl(TestCategory):
         for target in cat_config.get("ssh_targets", []):
             result = await ssh_connect(target["host"], target.get("port", 22))
             result.category = self.name
+            expected = target.get("expected", "")
+            if expected:
+                result.message = f"[expected: {expected}] {result.message}"
             results.append(result)
             await _human_delay()
 
         for target in cat_config.get("web_targets", []):
             result = await web_request(target["url"], context)
             result.category = self.name
+            expected = target.get("expected", "")
+            if expected:
+                result.message = f"[expected: {expected}] {result.message}"
             results.append(result)
             await _human_delay()
 
