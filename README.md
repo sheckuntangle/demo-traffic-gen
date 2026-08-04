@@ -31,19 +31,11 @@ Generates traffic that triggers and populates reporting for these firewall servi
 | **URL Reputation** | BrightCloud-flagged high-risk URLs |
 | **Legitimate Traffic** | High-volume normal browsing, DNS, and pings for realistic reporting |
 
-Each round interleaves blocked/alerted traffic with legitimate "allowed" traffic (~60/40 ratio by default) so the firewall dashboard shows a realistic mix.
+Each round interleaves blocked/alerted traffic with legitimate "allowed" traffic so the firewall dashboard shows a realistic mix.
 
 ## Multi-Client
 
-The generator simulates multiple clients with different browser fingerprints (user agents, viewports, timezones). For actual source IP diversity in firewall reports, configure IP aliasing on the host:
-
-```bash
-# Add extra IPs to your interface
-sudo ip addr add 10.0.1.101/24 dev eth0
-sudo ip addr add 10.0.1.102/24 dev eth0
-```
-
-Then set `source_ip` in the `client_profiles` section of `config.json`.
+The generator simulates multiple clients with different browser fingerprints (user agents, viewports, timezones). For actual source IP diversity in firewall reports, use the **IP Aliasing** section in the web GUI's Configuration tab to add extra IPs to your network interface, then assign them to client profiles.
 
 ## CLI Options
 
@@ -81,7 +73,7 @@ Then set `source_ip` in the `client_profiles` section of `config.json`.
 The web interface at `http://localhost:8080` provides:
 
 - **Dashboard**: Start/Stop controls with three run modes (Full Run, Triggers Only, Legitimate Only), per-category stats cards with "Run Now" buttons, and a live log stream
-- **Configuration**: Edit generator settings, per-category targets (add/remove IPs, URLs, domains), and legitimate traffic pools — all saved to config.json
+- **Configuration**: IP aliasing, client profiles, generator settings, per-category targets (add/remove IPs, URLs, domains), and legitimate traffic pools — all saved to config.json
 - **Run Modes**:
   - **Full Run**: Continuous legitimate traffic with periodic trigger rounds — ideal for overnight demos
   - **Triggers Only**: All enabled categories + legitimate traffic per round
@@ -89,10 +81,10 @@ The web interface at `http://localhost:8080` provides:
 
 ## Configuration
 
-Edit `config.json` to customize:
+Edit via the web GUI Configuration tab, or directly in `config.json`:
 
-- **generator**: Round interval, max rounds, client count, traffic ratio
-- **client_profiles**: Browser fingerprints and optional source IPs
+- **generator**: Round interval, legitimate interval, max rounds, client count, sample sizes
+- **client_profiles**: Browser fingerprints and source IPs for multi-client simulation
 - **categories**: Targets for each firewall service (enable/disable individually)
 - **legitimate_traffic**: Pool of allowed domains, URLs, and ping targets
 
@@ -111,11 +103,13 @@ These targets change over time — refresh periodically.
 ```
 config.json              # All targets and settings
 requirements.txt         # Python dependencies
+install.sh               # One-time Ubuntu setup (deps, venv, sudoers)
+run.sh                   # Launch wrapper (uses venv automatically)
 traffic_generator.py     # Legacy single-pass script (still works)
-demo_generator/          # New multi-client package
-├── __main__.py          # CLI entry point
-├── config.py            # Config loading
-├── engine.py            # Round scheduler and orchestrator
+demo_generator/          # Multi-client package
+├── __main__.py          # CLI entry point (--web default)
+├── config.py            # Config loading and defaults
+├── engine.py            # Round scheduler with run modes
 ├── clients.py           # Multi-client browser context pool
 ├── logger.py            # Dual console + file logging
 ├── stats.py             # Statistics tracking
@@ -130,12 +124,19 @@ demo_generator/          # New multi-client package
 │   ├── security.py
 │   ├── ip_reputation.py
 │   └── url_reputation.py
-└── tui/                 # Textual terminal UI
+├── web/                 # FastAPI web GUI (default)
+│   ├── server.py        # FastAPI app + uvicorn
+│   ├── run_manager.py   # Engine lifecycle manager
+│   ├── routes_api.py    # REST API + IP aliasing endpoints
+│   ├── routes_ws.py     # WebSocket log streaming
+│   └── static/          # Frontend assets
+└── tui/                 # Textual terminal UI (legacy)
     └── app.py
 ```
 
 ## Output
 
-- Color-coded real-time console output (headless mode) or TUI display
+- Live log stream in the web GUI dashboard (via WebSocket)
+- Color-coded console output in headless mode
 - Timestamped log files in `logs/` directory (rotated at 10MB)
-- Per-round and cumulative statistics summary
+- Per-round and cumulative statistics
