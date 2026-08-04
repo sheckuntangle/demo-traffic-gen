@@ -161,7 +161,7 @@ class TrafficGeneratorApp(App):
     def __init__(self, config):
         super().__init__()
         self._config = config
-        self._logger = None
+        self._traffic_logger = None
         self._stats = None
         self._engine = None
         self._engine_task = None
@@ -195,14 +195,14 @@ class TrafficGeneratorApp(App):
 
     def on_mount(self):
         self._stats = Stats()
-        self._logger = Logger(log_dir=self._config["generator"].get("log_dir", "./logs"))
-        self._logger.subscribe(self._on_log_entry)
-        self._engine = Engine(self._config, self._logger, self._stats)
+        self._traffic_logger = Logger(log_dir=self._config["generator"].get("log_dir", "./logs"))
+        self._traffic_logger.subscribe(self._on_log_entry)
+        self._engine = Engine(self._config, self._traffic_logger, self._stats)
         self._engine.on("on_round_start", self._on_round_start)
         self._engine.on("on_round_complete", self._on_round_complete)
 
         log_label = self.query_one("#log-file-label", Label)
-        log_label.update(f"Log: {self._logger.log_filename}")
+        log_label.update(f"Log: {self._traffic_logger.log_filename}")
 
     def _on_log_entry(self, entry):
         try:
@@ -300,8 +300,8 @@ class TrafficGeneratorApp(App):
                 await asyncio.wait_for(self._engine_task, timeout=10)
         if self._engine:
             await self._engine.cleanup()
-        if self._logger:
-            self._logger.print_summary(self._stats)
-            self._logger.close()
+        if self._traffic_logger:
+            self._traffic_logger.print_summary(self._stats)
+            self._traffic_logger.close()
         self._start_time = None
         self.exit()
