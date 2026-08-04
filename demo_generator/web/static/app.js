@@ -210,8 +210,7 @@ const App = {
             const s = cats[name] || {pass: 0, fail: 0};
             const total = s.pass + s.fail;
             const display = CATEGORY_DISPLAY[name] || name;
-            const isLegit = name === "legitimate";
-            const runBtn = isLegit ? "" : `<button class="btn btn-sm btn-outline-light mt-2" data-run="${name}" onclick="App.runCategory('${name}')">Run Now</button>`;
+            const runBtn = `<button class="btn btn-sm btn-outline-light mt-2" data-run="${name}" onclick="App.runCategory('${name}')">Run Now</button>`;
 
             html += `<div class="card stat-card">
                 <div class="card-body text-center p-2">
