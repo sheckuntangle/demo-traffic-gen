@@ -25,8 +25,9 @@ ANSI_RE = re.compile(r"\x1b\[[0-9;]*m")
 
 
 class Logger:
-    def __init__(self, log_dir="./logs"):
+    def __init__(self, log_dir="./logs", quiet=False):
         self._callbacks = []
+        self._quiet = quiet
         self._log_dir = log_dir
         os.makedirs(log_dir, exist_ok=True)
 
@@ -70,7 +71,8 @@ class Logger:
         if client_name:
             console_line = f"{CYAN}[{client_name:18}]{RESET} " + console_line
 
-        print(console_line)
+        if not self._quiet:
+            print(console_line)
 
         file_line = ANSI_RE.sub("", console_line)
         self._file_logger.info(file_line)
@@ -89,8 +91,9 @@ class Logger:
 
     def info(self, category, message):
         timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        console_line = f"[{timestamp}] {YELLOW}>>> {message}{RESET}"
-        print(console_line)
+        if not self._quiet:
+            console_line = f"[{timestamp}] {YELLOW}>>> {message}{RESET}"
+            print(console_line)
         self._file_logger.info(f"[{timestamp}] >>> {message}")
         self._emit({
             "timestamp": timestamp,

@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="en" data-bs-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Firewall Demo Traffic Generator</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="/static/style.css" rel="stylesheet">
+</head>
+<body>
+
+<nav class="navbar navbar-dark px-3">
+    <span class="navbar-brand mb-0 h1">Firewall Demo Traffic Generator</span>
+    <div class="d-flex align-items-center gap-3">
+        <span id="status-badge" class="badge status-badge status-stopped">Stopped</span>
+        <span id="round-display" class="text-muted">Round 0</span>
+        <span id="elapsed-display" class="text-muted">00:00:00</span>
+    </div>
+</nav>
+
+<div id="disconnect-banner" class="disconnect-banner">Disconnected from server - reconnecting...</div>
+
+<div class="container-fluid mt-3">
+    <ul class="nav nav-tabs" role="tablist">
+        <li class="nav-item">
+            <button class="nav-link active" data-bs-toggle="tab" data-bs-target="#dashboard-tab">Dashboard</button>
+        </li>
+        <li class="nav-item">
+            <button class="nav-link" data-bs-toggle="tab" data-bs-target="#config-tab">Configuration</button>
+        </li>
+    </ul>
+
+    <div class="tab-content mt-3">
+        <!-- Dashboard Tab -->
+        <div class="tab-pane fade show active" id="dashboard-tab">
+            <!-- Controls -->
+            <div class="card mb-3">
+                <div class="card-body d-flex align-items-center gap-3 flex-wrap">
+                    <select id="mode-select" class="form-select" style="width:auto">
+                        <option value="full">Full Run (legit + periodic triggers)</option>
+                        <option value="triggers">Triggers Only (all categories per round)</option>
+                        <option value="legit">Legitimate Only (clean traffic)</option>
+                    </select>
+                    <button id="start-btn" class="btn btn-success" onclick="App.start()">Start</button>
+                    <button id="stop-btn" class="btn btn-danger" onclick="App.stop()" disabled>Stop</button>
+                    <span id="mode-info" class="text-muted small"></span>
+                </div>
+            </div>
+
+            <!-- Stats Cards -->
+            <div id="stats-grid" class="d-flex flex-wrap gap-2 mb-3"></div>
+
+            <!-- Log Panel -->
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <span>Live Log</span>
+                    <div class="d-flex gap-2">
+                        <div class="form-check form-switch">
+                            <input class="form-check-input" type="checkbox" id="autoscroll-toggle" checked>
+                            <label class="form-check-label small" for="autoscroll-toggle">Auto-scroll</label>
+                        </div>
+                        <button class="btn btn-sm btn-outline-light" onclick="App.clearLog()">Clear</button>
+                    </div>
+                </div>
+                <div id="log-panel"></div>
+            </div>
+        </div>
+
+        <!-- Configuration Tab -->
+        <div class="tab-pane fade" id="config-tab">
+            <!-- Generator Settings -->
+            <div class="card mb-3">
+                <div class="card-header"><strong>Generator Settings</strong></div>
+                <div class="card-body">
+                    <div class="row g-3" id="generator-settings"></div>
+                    <button class="btn btn-primary btn-sm mt-3" onclick="App.saveGenerator()">Save Generator Settings</button>
+                </div>
+            </div>
+
+            <!-- Category Configs -->
+            <div class="accordion" id="category-accordion"></div>
+
+            <!-- Legitimate Traffic -->
+            <div class="card mt-3">
+                <div class="card-header"><strong>Legitimate Traffic Pools</strong></div>
+                <div class="card-body" id="legit-config"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+<script src="/static/app.js"></script>
+</body>
+</html>

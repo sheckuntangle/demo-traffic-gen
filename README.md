@@ -1,6 +1,6 @@
 # Firewall Demo Traffic Generator
 
-Multi-client, long-running traffic generator for populating firewall reporting dashboards. Generates realistic traffic across 8 firewall service categories with a terminal UI for monitoring.
+Multi-client, long-running traffic generator for populating firewall reporting dashboards. Generates realistic traffic across 8 firewall service categories with a web-based GUI for control and monitoring.
 
 ## Quick Start
 
@@ -8,10 +8,10 @@ Multi-client, long-running traffic generator for populating firewall reporting d
 # Install everything (Ubuntu — one time, requires sudo)
 ./install.sh
 
-# Launch with TUI
+# Launch web GUI (default — opens at http://localhost:8080)
 ./run.sh
 
-# Or run headless (no TUI, console output only)
+# Or run headless (console output only, no GUI)
 ./run.sh --headless
 ```
 
@@ -50,8 +50,12 @@ Then set `source_ip` in the `client_profiles` section of `config.json`.
 ```
 ./run.sh [OPTIONS]
 
+  --web               Run with web GUI (default, http://localhost:8080)
+  --headless          Run without GUI (console-only output)
+  --tui               Run with terminal UI (legacy)
+  --host ADDR         Web GUI bind address (default: 0.0.0.0)
+  --port PORT         Web GUI port (default: 8080)
   --config PATH       Config file path (default: config.json)
-  --headless          Run without TUI (console-only output)
   --rounds N          Number of rounds, 0=unlimited (default: from config)
   --interval SECS     Seconds between rounds (default: from config)
   --clients N         Number of simulated clients (default: from config)
@@ -62,25 +66,26 @@ Then set `source_ip` in the `client_profiles` section of `config.json`.
 ### Examples
 
 ```bash
-# Run 5 rounds with 2 clients, 60-second intervals
+# Launch web GUI on custom port
+./run.sh --port 9090
+
+# Run headless with 5 rounds
 ./run.sh --headless --rounds 5 --clients 2 --interval 60
 
 # Run only DNS filter and geo-IP categories
 ./run.sh --headless --categories dns_filter,geo_ip
-
-# Run overnight (unlimited rounds, 5-minute intervals)
-./run.sh --rounds 0 --interval 300
 ```
 
-## TUI Controls
+## Web GUI
 
-| Key | Action |
-|-----|--------|
-| `s` | Start / Stop the generator |
-| `c` | Clear the log panel |
-| `q` | Quit (graceful shutdown) |
+The web interface at `http://localhost:8080` provides:
 
-The TUI shows live logs, per-category statistics, and category toggles for enabling/disabling test types at runtime.
+- **Dashboard**: Start/Stop controls with three run modes (Full Run, Triggers Only, Legitimate Only), per-category stats cards with "Run Now" buttons, and a live log stream
+- **Configuration**: Edit generator settings, per-category targets (add/remove IPs, URLs, domains), and legitimate traffic pools — all saved to config.json
+- **Run Modes**:
+  - **Full Run**: Continuous legitimate traffic with periodic trigger rounds — ideal for overnight demos
+  - **Triggers Only**: All enabled categories + legitimate traffic per round
+  - **Legitimate Only**: Clean passing traffic only
 
 ## Configuration
 

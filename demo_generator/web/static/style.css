@@ -1,0 +1,52 @@
+body { background: #1a1d23; color: #e0e0e0; }
+.navbar { background: #23272e !important; }
+.card { background: #23272e; border-color: #333; }
+.card-header { background: #2a2e36; border-color: #333; }
+.form-control, .form-select { background: #2a2e36; color: #e0e0e0; border-color: #444; }
+.form-control:focus, .form-select:focus { background: #2a2e36; color: #e0e0e0; border-color: #0d6efd; }
+.table { color: #e0e0e0; }
+.btn-outline-light { border-color: #555; color: #ccc; }
+.btn-outline-light:hover { background: #333; color: #fff; }
+
+#log-panel {
+    height: 400px;
+    overflow-y: auto;
+    background: #0d1117;
+    border: 1px solid #333;
+    border-radius: 6px;
+    font-family: 'Consolas', 'Monaco', monospace;
+    font-size: 12px;
+    padding: 8px;
+    line-height: 1.5;
+}
+#log-panel .log-pass { color: #3fb950; }
+#log-panel .log-fail { color: #f85149; }
+#log-panel .log-info { color: #58a6ff; }
+#log-panel .log-line { white-space: nowrap; }
+
+.stat-card { min-width: 180px; }
+.stat-card .pass-count { color: #3fb950; font-size: 1.5rem; font-weight: bold; }
+.stat-card .fail-count { color: #f85149; font-size: 1.5rem; font-weight: bold; }
+.stat-card .total-count { color: #8b949e; }
+
+.status-badge { font-size: 0.9rem; }
+.status-running { background: #238636; }
+.status-stopped { background: #6e7681; }
+.status-stopping { background: #d29922; }
+
+.accordion-button { background: #2a2e36; color: #e0e0e0; }
+.accordion-button:not(.collapsed) { background: #1f6feb33; color: #58a6ff; }
+.accordion-body { background: #1a1d23; }
+.accordion-item { background: #23272e; border-color: #333; }
+
+.target-table { font-size: 0.85rem; }
+.target-table td { vertical-align: middle; }
+
+.disconnect-banner {
+    display: none;
+    background: #d29922;
+    color: #000;
+    text-align: center;
+    padding: 6px;
+    font-weight: bold;
+}

@@ -115,7 +115,13 @@ class ClientPool:
 
         return profiles
 
+    @property
+    def is_started(self):
+        return self._browser is not None
+
     async def start(self):
+        if self.is_started:
+            return
         from playwright.async_api import async_playwright
         self._playwright = await async_playwright().start()
         self._browser = await self._playwright.chromium.launch(

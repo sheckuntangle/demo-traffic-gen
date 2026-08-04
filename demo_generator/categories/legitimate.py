@@ -11,11 +11,13 @@ class Legitimate(TestCategory):
 
     async def run(self, context, config, source_ip=None):
         legit = config.get("legitimate_traffic", {})
+        gen = config.get("generator", {})
         results = []
 
         dns_domains = legit.get("dns_domains", [])
         if dns_domains:
-            sample_size = min(random.randint(15, 25), len(dns_domains))
+            dns_range = gen.get("dns_sample_range", [15, 25])
+            sample_size = min(random.randint(dns_range[0], dns_range[1]), len(dns_domains))
             for domain in random.sample(dns_domains, sample_size):
                 result = await dns_query(domain)
                 result.category = self.name
@@ -24,7 +26,8 @@ class Legitimate(TestCategory):
 
         web_urls = legit.get("web_urls", [])
         if web_urls:
-            sample_size = min(random.randint(10, 20), len(web_urls))
+            web_range = gen.get("web_sample_range", [10, 20])
+            sample_size = min(random.randint(web_range[0], web_range[1]), len(web_urls))
             for url in random.sample(web_urls, sample_size):
                 result = await web_request(url, context)
                 result.category = self.name
@@ -33,7 +36,8 @@ class Legitimate(TestCategory):
 
         ping_targets = legit.get("ping_targets", [])
         if ping_targets:
-            sample_size = min(random.randint(2, 4), len(ping_targets))
+            ping_range = gen.get("ping_sample_range", [2, 4])
+            sample_size = min(random.randint(ping_range[0], ping_range[1]), len(ping_targets))
             for target in random.sample(ping_targets, sample_size):
                 result = await ping(target["ip"], target.get("name", ""), source_ip=source_ip)
                 result.category = self.name

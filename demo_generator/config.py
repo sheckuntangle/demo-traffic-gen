@@ -18,9 +18,12 @@ REQUIRED_CATEGORY_KEYS = {
 
 GENERATOR_DEFAULTS = {
     "round_interval_seconds": 300,
+    "legitimate_interval_seconds": 45,
     "max_rounds": 0,
     "client_count": 3,
-    "legitimate_traffic_ratio": 0.6,
+    "dns_sample_range": [15, 25],
+    "web_sample_range": [10, 20],
+    "ping_sample_range": [2, 4],
     "log_dir": "./logs",
     "browser_recycle_rounds": 10,
 }
