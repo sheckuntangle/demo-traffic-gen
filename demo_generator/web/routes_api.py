@@ -1,5 +1,9 @@
 """REST API endpoints for control, config, and stats."""
 
+import asyncio
+import json
+import re
+
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel
 from typing import Optional
@@ -111,3 +115,78 @@ async def list_categories(request: Request):
         enabled = manager.config["categories"].get(name, {}).get("enabled", False)
         result.append({"name": name, "display_name": cls.display_name, "enabled": enabled})
     return result
+
+
+# --- Network / IP Aliasing ---
+
+async def _run_cmd(*args):
+    proc = await asyncio.create_subprocess_exec(
+        *args, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE,
+    )
+    stdout, stderr = await proc.communicate()
+    return proc.returncode, stdout.decode(), stderr.decode()
+
+
+@router.get("/network/interfaces")
+async def list_interfaces():
+    rc, stdout, _ = await _run_cmd("ip", "-j", "addr", "show")
+    if rc != 0:
+        raise HTTPException(500, "Failed to list interfaces")
+    interfaces = json.loads(stdout)
+    result = []
+    for iface in interfaces:
+        name = iface.get("ifname", "")
+        if name == "lo":
+            continue
+        addrs = []
+        for info in iface.get("addr_info", []):
+            if info.get("family") == "inet":
+                addrs.append({
+                    "ip": info["local"],
+                    "prefix": info.get("prefixlen", 24),
+                    "label": info.get("label", ""),
+                })
+        result.append({"name": name, "addresses": addrs})
+    return result
+
+
+class AddIpRequest(BaseModel):
+    interface: str
+    ip: str
+    prefix: int = 24
+
+
+@router.post("/network/add-ip")
+async def add_ip(req: AddIpRequest):
+    if not re.match(r"^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$", req.ip):
+        raise HTTPException(400, "Invalid IP address format")
+    if not re.match(r"^[a-zA-Z0-9]+$", req.interface):
+        raise HTTPException(400, "Invalid interface name")
+
+    rc, _, stderr = await _run_cmd(
+        "sudo", "ip", "addr", "add", f"{req.ip}/{req.prefix}", "dev", req.interface,
+    )
+    if rc != 0:
+        raise HTTPException(500, f"Failed to add IP: {stderr.strip()}")
+    return {"status": "added", "ip": req.ip, "interface": req.interface}
+
+
+class RemoveIpRequest(BaseModel):
+    interface: str
+    ip: str
+    prefix: int = 24
+
+
+@router.post("/network/remove-ip")
+async def remove_ip(req: RemoveIpRequest):
+    if not re.match(r"^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$", req.ip):
+        raise HTTPException(400, "Invalid IP address format")
+    if not re.match(r"^[a-zA-Z0-9]+$", req.interface):
+        raise HTTPException(400, "Invalid interface name")
+
+    rc, _, stderr = await _run_cmd(
+        "sudo", "ip", "addr", "del", f"{req.ip}/{req.prefix}", "dev", req.interface,
+    )
+    if rc != 0:
+        raise HTTPException(500, f"Failed to remove IP: {stderr.strip()}")
+    return {"status": "removed", "ip": req.ip, "interface": req.interface}

@@ -39,9 +39,20 @@ REAL_USER="${SUDO_USER:-$(whoami)}"
 mkdir -p "$SCRIPT_DIR/logs"
 chown -R "$REAL_USER":"$REAL_USER" "$SCRIPT_DIR/logs" "$VENV_DIR"
 
+echo "[5/5] Setting up sudoers for IP aliasing..."
+SUDOERS_FILE="/etc/sudoers.d/demo-traffic-gen"
+cat > "$SUDOERS_FILE" <<SUDOERS
+# Allow the traffic generator web GUI to manage IP aliases
+$REAL_USER ALL=(root) NOPASSWD: /sbin/ip addr add *
+$REAL_USER ALL=(root) NOPASSWD: /sbin/ip addr del *
+$REAL_USER ALL=(root) NOPASSWD: /usr/sbin/ip addr add *
+$REAL_USER ALL=(root) NOPASSWD: /usr/sbin/ip addr del *
+SUDOERS
+chmod 440 "$SUDOERS_FILE"
+
 echo ""
 echo "=== Installation complete ==="
 echo ""
 echo "Run the generator:"
-echo "  ./run.sh              # TUI mode"
+echo "  ./run.sh              # Web GUI at http://localhost:8080"
 echo "  ./run.sh --headless   # Console-only mode"

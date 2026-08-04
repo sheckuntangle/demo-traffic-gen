@@ -232,6 +232,7 @@ const App = {
         const res = await fetch("/api/config");
         this.config = await res.json();
         this.renderGeneratorSettings();
+        this.loadNetworkInterfaces();
         this.renderClientProfiles();
         this.renderCategoryConfigs();
         this.renderLegitConfig();
@@ -295,6 +296,75 @@ const App = {
         });
         this.config.generator = data;
         this.showToast("Generator settings saved");
+    },
+
+    async loadNetworkInterfaces() {
+        const res = await fetch("/api/network/interfaces");
+        const interfaces = await res.json();
+        this.interfaces = interfaces;
+
+        const container = document.getElementById("network-interfaces");
+        const ifaceSelect = document.getElementById("add-ip-iface");
+
+        ifaceSelect.innerHTML = "";
+        let html = "";
+
+        for (const iface of interfaces) {
+            ifaceSelect.innerHTML += `<option value="${this.esc(iface.name)}">${this.esc(iface.name)}</option>`;
+
+            html += `<div class="mb-2"><strong>${this.esc(iface.name)}</strong>`;
+            if (iface.addresses.length === 0) {
+                html += ` <span class="text-muted small">no IPv4 addresses</span>`;
+            } else {
+                html += `<div class="d-flex flex-wrap gap-2 mt-1">`;
+                for (const addr of iface.addresses) {
+                    const isPrimary = iface.addresses.indexOf(addr) === 0;
+                    const badge = isPrimary ? "bg-primary" : "bg-info";
+                    const removeBtn = isPrimary ? ""
+                        : ` <button class="btn btn-sm btn-link text-danger p-0 ms-1" onclick="App.removeIpAlias('${this.esc(iface.name)}', '${this.esc(addr.ip)}', ${addr.prefix})" title="Remove">&times;</button>`;
+                    html += `<span class="badge ${badge}">${this.esc(addr.ip)}/${addr.prefix}${removeBtn}</span>`;
+                }
+                html += `</div>`;
+            }
+            html += `</div>`;
+        }
+        container.innerHTML = html;
+    },
+
+    async addIpAlias() {
+        const iface = document.getElementById("add-ip-iface").value;
+        const ip = document.getElementById("add-ip-addr").value.trim();
+        const prefix = parseInt(document.getElementById("add-ip-prefix").value) || 24;
+        if (!ip) return;
+
+        const res = await fetch("/api/network/add-ip", {
+            method: "POST",
+            headers: {"Content-Type": "application/json"},
+            body: JSON.stringify({interface: iface, ip, prefix}),
+        });
+        if (res.ok) {
+            document.getElementById("add-ip-addr").value = "";
+            this.showToast(`Added ${ip} to ${iface}`);
+            this.loadNetworkInterfaces();
+        } else {
+            const err = await res.json();
+            this.showToast(`Error: ${err.detail || "Failed"}`);
+        }
+    },
+
+    async removeIpAlias(iface, ip, prefix) {
+        const res = await fetch("/api/network/remove-ip", {
+            method: "POST",
+            headers: {"Content-Type": "application/json"},
+            body: JSON.stringify({interface: iface, ip, prefix}),
+        });
+        if (res.ok) {
+            this.showToast(`Removed ${ip} from ${iface}`);
+            this.loadNetworkInterfaces();
+        } else {
+            const err = await res.json();
+            this.showToast(`Error: ${err.detail || "Failed"}`);
+        }
     },
 
     renderClientProfiles() {
