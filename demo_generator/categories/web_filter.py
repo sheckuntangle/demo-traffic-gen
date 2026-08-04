@@ -1,0 +1,27 @@
+"""Web Filter — block/reject/alert by URL category (marijuana, shopping, sports)."""
+
+import random
+from . import TestCategory
+from ..primitives import web_request
+
+
+class WebFilter(TestCategory):
+    name = "web_filter"
+    display_name = "Web Filter"
+
+    async def run(self, context, config, source_ip=None):
+        cat_config = config["categories"].get("web_filter", {})
+        results = []
+
+        for target in cat_config.get("targets", []):
+            result = await web_request(target["url"], context)
+            result.category = self.name
+            results.append(result)
+            await _human_delay()
+
+        return results
+
+
+async def _human_delay():
+    import asyncio
+    await asyncio.sleep(random.uniform(2, 5))
