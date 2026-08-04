@@ -40,6 +40,9 @@ async def run_single(category_name: str, request: Request):
         await manager.run_single(category_name)
     except ValueError as e:
         raise HTTPException(400, str(e))
+    except Exception as e:
+        manager.logger.info("ERROR", f"Single category run failed: {category_name}: {e}")
+        raise HTTPException(500, str(e))
     return {"status": "completed", "category": category_name}
 
 

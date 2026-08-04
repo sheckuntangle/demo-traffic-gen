@@ -97,8 +97,13 @@ class RunManager:
                     self._run_task.cancel()
 
     async def run_single(self, category_name):
-        engine = Engine(self.config, self.logger, self.stats, pool=self._pool)
-        await engine.run_single_category(category_name)
+        self.logger.info("SYSTEM", f"Starting single run: {category_name}")
+        try:
+            engine = Engine(self.config, self.logger, self.stats, pool=self._pool)
+            await engine.run_single_category(category_name)
+        except Exception as e:
+            self.logger.info("ERROR", f"Single run error ({category_name}): {type(e).__name__}: {e}")
+            raise
 
     def update_config(self, section, key, data):
         if section == "generator":

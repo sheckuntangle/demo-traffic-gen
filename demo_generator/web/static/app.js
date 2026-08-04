@@ -107,8 +107,14 @@ const App = {
         const btn = document.querySelector(`[data-run="${name}"]`);
         if (btn) { btn.disabled = true; btn.textContent = "Running..."; }
         try {
-            await fetch(`/api/run/${name}`, {method: "POST"});
+            const res = await fetch(`/api/run/${name}`, {method: "POST"});
+            if (!res.ok) {
+                const err = await res.json().catch(() => ({}));
+                this.showToast(`Error: ${err.detail || res.statusText}`);
+            }
             this.fetchStats();
+        } catch (e) {
+            this.showToast(`Network error: ${e.message}`);
         } finally {
             if (btn) { btn.disabled = false; btn.textContent = "Run Now"; }
         }

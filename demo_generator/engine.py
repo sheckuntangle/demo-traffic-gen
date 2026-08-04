@@ -289,10 +289,14 @@ class Engine:
         if not cat_cls:
             raise ValueError(f"Unknown category: {category_name}")
 
+        self._logger.info("SYSTEM", f"Initializing browser pool...")
         await self._pool.start()
         self._logger.info("SYSTEM", f"Running single category: {cat_cls.display_name}")
-        await self._run_categories_on_clients([cat_cls()])
-        self._logger.info("SYSTEM", f"Single category run complete: {cat_cls.display_name}")
+        try:
+            await self._run_categories_on_clients([cat_cls()])
+        except Exception as e:
+            self._logger.info("ERROR", f"Category {cat_cls.display_name} failed: {type(e).__name__}: {e}")
+            raise
         self._logger.info("SYSTEM", f"Single category run complete: {cat_cls.display_name}")
 
     async def cleanup(self):
