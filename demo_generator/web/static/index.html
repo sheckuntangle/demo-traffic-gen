@@ -32,10 +32,10 @@
 
     <div class="tab-content mt-3">
         <!-- Dashboard Tab -->
-        <div class="tab-pane fade show active" id="dashboard-tab">
+        <div class="tab-pane fade show active d-flex flex-column" id="dashboard-tab" style="height: calc(100vh - 120px)">
             <!-- Controls -->
-            <div class="card mb-3">
-                <div class="card-body d-flex align-items-center gap-3 flex-wrap">
+            <div class="card mb-2 flex-shrink-0">
+                <div class="card-body d-flex align-items-center gap-3 flex-wrap py-2">
                     <select id="mode-select" class="form-select" style="width:auto">
                         <option value="full">Full Run (legit + periodic triggers)</option>
                         <option value="triggers">Triggers Only (all categories per round)</option>
@@ -48,11 +48,11 @@
             </div>
 
             <!-- Stats Cards -->
-            <div id="stats-grid" class="d-flex flex-wrap gap-2 mb-3"></div>
+            <div id="stats-grid" class="row row-cols-3 row-cols-md-5 row-cols-xl-9 g-2 mb-2 flex-shrink-0"></div>
 
             <!-- Log Panel -->
-            <div class="card">
-                <div class="card-header d-flex justify-content-between align-items-center">
+            <div class="card flex-grow-1 d-flex flex-column" style="min-height:0">
+                <div class="card-header d-flex justify-content-between align-items-center flex-shrink-0">
                     <span>Live Log</span>
                     <div class="d-flex gap-2">
                         <div class="form-check form-switch">
@@ -62,7 +62,7 @@
                         <button class="btn btn-sm btn-outline-light" onclick="App.clearLog()">Clear</button>
                     </div>
                 </div>
-                <div id="log-panel"></div>
+                <div id="log-panel" class="flex-grow-1"></div>
             </div>
         </div>
 

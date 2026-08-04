@@ -228,7 +228,7 @@ const App = {
             const display = CATEGORY_DISPLAY[name] || name;
             const runBtn = `<button class="btn btn-sm btn-outline-light mt-2" data-run="${name}" onclick="App.runCategory('${name}')">Run Now</button>`;
 
-            html += `<div class="card stat-card">
+            html += `<div class="col"><div class="card stat-card h-100">
                 <div class="card-body text-center p-2">
                     <div class="small text-muted mb-1">${this.esc(display)}</div>
                     <span class="pass-count">${s.pass}</span>
@@ -237,7 +237,7 @@ const App = {
                     <div class="total-count small">${total} total</div>
                     ${runBtn}
                 </div>
-            </div>`;
+            </div></div>`;
         }
         grid.innerHTML = html;
     },

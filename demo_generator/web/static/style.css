@@ -9,12 +9,10 @@ body { background: #1a1d23; color: #e0e0e0; }
 .btn-outline-light:hover { background: #333; color: #fff; }
 
 #log-panel {
-    height: calc(100vh - 350px);
-    min-height: 300px;
     overflow-y: auto;
     background: #0d1117;
     border: 1px solid #333;
-    border-radius: 6px;
+    border-radius: 0 0 6px 6px;
     font-family: 'Consolas', 'Monaco', monospace;
     font-size: 12px;
     padding: 8px;
@@ -26,7 +24,7 @@ body { background: #1a1d23; color: #e0e0e0; }
 #log-panel .log-line { white-space: nowrap; }
 #log-panel .log-separator { color: #444; margin-top: 4px; }
 
-.stat-card { min-width: 180px; }
+.stat-card { }
 .stat-card .pass-count { color: #3fb950; font-size: 1.5rem; font-weight: bold; }
 .stat-card .fail-count { color: #f85149; font-size: 1.5rem; font-weight: bold; }
 .stat-card .total-count { color: #8b949e; }
