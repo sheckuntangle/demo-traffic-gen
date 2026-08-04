@@ -14,6 +14,7 @@ class UrlReputation(TestCategory):
         results = []
 
         for target in cat_config.get("targets", []):
+            await context.clear_cookies()
             result = await web_request(target["url"], context)
             result.category = self.name
             expected = target.get("expected", "")

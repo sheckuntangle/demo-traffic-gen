@@ -14,6 +14,11 @@ class WebFilter(TestCategory):
         results = []
 
         for target in cat_config.get("targets", []):
+            await context.clear_cookies()
+            try:
+                await context.clear_permissions()
+            except Exception:
+                pass
             result = await web_request(target["url"], context)
             result.category = self.name
             expected = target.get("expected", "")

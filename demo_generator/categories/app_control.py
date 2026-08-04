@@ -23,6 +23,7 @@ class AppControl(TestCategory):
             await _human_delay()
 
         for target in cat_config.get("web_targets", []):
+            await context.clear_cookies()
             result = await web_request(target["url"], context)
             result.category = self.name
             expected = target.get("expected", "")

@@ -40,6 +40,7 @@ class DynamicBlocklist(TestCategory):
             await _delay()
 
             url = f"https://{target['domain']}"
+            await context.clear_cookies()
             result = await web_request(url, context)
             result.category = self.name
             result.message = exp_tag + result.message
