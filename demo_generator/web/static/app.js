@@ -254,18 +254,22 @@ const App = {
     // --- Config ---
 
     async loadConfig() {
+        console.log("[loadConfig] starting");
         try {
             const res = await fetch("/api/config");
+            console.log("[loadConfig] /api/config status:", res.status);
             this.config = await res.json();
+            console.log("[loadConfig] categories:", Object.keys(this.config.categories || {}));
         } catch (e) {
-            console.error("Failed to load config:", e);
+            console.error("[loadConfig] fetch failed:", e);
             this.config = {generator: {}, categories: {}, client_profiles: [], legitimate_traffic: {}};
         }
-        try { await this.loadNetworkInterfaces(); } catch (e) { console.error("Failed to load interfaces:", e); }
-        try { this.renderGeneratorSettings(); } catch (e) { console.error("renderGeneratorSettings error:", e); }
-        try { this.renderClientProfiles(); } catch (e) { console.error("renderClientProfiles error:", e); }
-        try { this.renderCategoryConfigs(); } catch (e) { console.error("renderCategoryConfigs error:", e); }
-        try { this.renderLegitConfig(); } catch (e) { console.error("renderLegitConfig error:", e); }
+        try { await this.loadNetworkInterfaces(); console.log("[loadConfig] interfaces OK"); } catch (e) { console.error("[loadConfig] interfaces error:", e); }
+        try { this.renderGeneratorSettings(); console.log("[loadConfig] generator OK"); } catch (e) { console.error("[loadConfig] renderGeneratorSettings error:", e); }
+        try { this.renderClientProfiles(); console.log("[loadConfig] profiles OK"); } catch (e) { console.error("[loadConfig] renderClientProfiles error:", e); }
+        try { this.renderCategoryConfigs(); console.log("[loadConfig] categories OK"); } catch (e) { console.error("[loadConfig] renderCategoryConfigs error:", e); }
+        try { this.renderLegitConfig(); console.log("[loadConfig] legit OK"); } catch (e) { console.error("[loadConfig] renderLegitConfig error:", e); }
+        console.log("[loadConfig] done");
     },
 
     async loadCategories() {
