@@ -1,6 +1,10 @@
 """WebSocket endpoint for live log and status streaming."""
 
+import logging
+
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
+
+logger = logging.getLogger("demo_generator.web.ws")
 
 router = APIRouter()
 
@@ -10,6 +14,7 @@ async def websocket_endpoint(websocket: WebSocket):
     manager = websocket.app.state.manager
     await websocket.accept()
     manager.ws_clients.add(websocket)
+    logger.info(f"WebSocket connected ({len(manager.ws_clients)} clients)")
 
     try:
         await websocket.send_json({"type": "status", "data": manager.get_status()})
@@ -18,8 +23,8 @@ async def websocket_endpoint(websocket: WebSocket):
         while True:
             await websocket.receive_text()
     except WebSocketDisconnect:
-        pass
-    except Exception:
-        pass
+        logger.info("WebSocket disconnected")
+    except Exception as e:
+        logger.error(f"WebSocket error: {type(e).__name__}: {e}")
     finally:
         manager.ws_clients.discard(websocket)

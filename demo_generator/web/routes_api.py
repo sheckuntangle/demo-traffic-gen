@@ -2,11 +2,14 @@
 
 import asyncio
 import json
+import logging
 import re
 
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel
 from typing import Optional
+
+logger = logging.getLogger("demo_generator.web.api")
 
 router = APIRouter()
 
@@ -61,6 +64,7 @@ async def stats(request: Request):
 @router.get("/config")
 async def get_config(request: Request):
     manager = request.app.state.manager
+    logger.info("GET /config")
     return manager.config
 
 
@@ -76,9 +80,11 @@ async def get_category_config(name: str, request: Request):
 async def update_category_config(name: str, request: Request):
     manager = request.app.state.manager
     data = await request.json()
+    logger.info(f"PUT /config/categories/{name}")
     try:
         manager.update_config("categories", name, data)
     except ValueError as e:
+        logger.error(f"Config update failed: {e}")
         raise HTTPException(400, str(e))
     return {"status": "saved"}
 
