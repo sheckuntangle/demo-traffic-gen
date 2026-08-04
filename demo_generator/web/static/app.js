@@ -331,25 +331,59 @@ const App = {
         container.innerHTML = html;
     },
 
+    parseIpInput(input) {
+        input = input.trim();
+        const rangeMatch = input.match(/^(\d{1,3}\.\d{1,3}\.\d{1,3}\.)(\d{1,3})-(\d{1,3})$/);
+        if (rangeMatch) {
+            const base = rangeMatch[1];
+            const start = parseInt(rangeMatch[2]);
+            const end = parseInt(rangeMatch[3]);
+            if (start > end || start < 0 || end > 255) return [];
+            const ips = [];
+            for (let i = start; i <= end; i++) ips.push(base + i);
+            return ips;
+        }
+        if (/^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(input)) return [input];
+        return [];
+    },
+
     async addIpAlias() {
         const iface = document.getElementById("add-ip-iface").value;
-        const ip = document.getElementById("add-ip-addr").value.trim();
+        const input = document.getElementById("add-ip-addr").value.trim();
         const prefix = parseInt(document.getElementById("add-ip-prefix").value) || 24;
-        if (!ip) return;
+        if (!input) return;
 
-        const res = await fetch("/api/network/add-ip", {
-            method: "POST",
-            headers: {"Content-Type": "application/json"},
-            body: JSON.stringify({interface: iface, ip, prefix}),
-        });
-        if (res.ok) {
-            document.getElementById("add-ip-addr").value = "";
-            this.showToast(`Added ${ip} to ${iface}`);
-            this.loadNetworkInterfaces();
-        } else {
-            const err = await res.json();
-            this.showToast(`Error: ${err.detail || "Failed"}`);
+        const ips = this.parseIpInput(input);
+        if (ips.length === 0) {
+            this.showToast("Invalid IP or range format");
+            return;
         }
+
+        let added = 0;
+        let lastErr = "";
+        for (const ip of ips) {
+            const res = await fetch("/api/network/add-ip", {
+                method: "POST",
+                headers: {"Content-Type": "application/json"},
+                body: JSON.stringify({interface: iface, ip, prefix}),
+            });
+            if (res.ok) {
+                added++;
+            } else {
+                const err = await res.json();
+                lastErr = err.detail || "Failed";
+            }
+        }
+
+        document.getElementById("add-ip-addr").value = "";
+        if (added === ips.length) {
+            this.showToast(`Added ${added} IP${added > 1 ? "s" : ""} to ${iface}`);
+        } else if (added > 0) {
+            this.showToast(`Added ${added}/${ips.length} IPs (last error: ${lastErr})`);
+        } else {
+            this.showToast(`Error: ${lastErr}`);
+        }
+        this.loadNetworkInterfaces();
     },
 
     async removeIpAlias(iface, ip, prefix) {
