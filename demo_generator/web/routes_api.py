@@ -138,10 +138,15 @@ async def _run_cmd(*args):
 
 @router.get("/network/interfaces")
 async def list_interfaces():
-    rc, stdout, _ = await _run_cmd("ip", "-j", "addr", "show")
+    rc, stdout, stderr = await _run_cmd("ip", "-j", "addr", "show")
     if rc != 0:
-        raise HTTPException(500, "Failed to list interfaces")
-    interfaces = json.loads(stdout)
+        logger.error(f"ip -j addr show failed: {stderr}")
+        return []
+    try:
+        interfaces = json.loads(stdout)
+    except json.JSONDecodeError as e:
+        logger.error(f"Failed to parse ip output: {e}")
+        return []
     result = []
     for iface in interfaces:
         name = iface.get("ifname", "")

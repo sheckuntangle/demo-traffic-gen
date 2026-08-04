@@ -254,13 +254,18 @@ const App = {
     // --- Config ---
 
     async loadConfig() {
-        const res = await fetch("/api/config");
-        this.config = await res.json();
-        await this.loadNetworkInterfaces();
-        this.renderGeneratorSettings();
-        this.renderClientProfiles();
-        this.renderCategoryConfigs();
-        this.renderLegitConfig();
+        try {
+            const res = await fetch("/api/config");
+            this.config = await res.json();
+        } catch (e) {
+            console.error("Failed to load config:", e);
+            this.config = {generator: {}, categories: {}, client_profiles: [], legitimate_traffic: {}};
+        }
+        try { await this.loadNetworkInterfaces(); } catch (e) { console.error("Failed to load interfaces:", e); }
+        try { this.renderGeneratorSettings(); } catch (e) { console.error("renderGeneratorSettings error:", e); }
+        try { this.renderClientProfiles(); } catch (e) { console.error("renderClientProfiles error:", e); }
+        try { this.renderCategoryConfigs(); } catch (e) { console.error("renderCategoryConfigs error:", e); }
+        try { this.renderLegitConfig(); } catch (e) { console.error("renderLegitConfig error:", e); }
     },
 
     async loadCategories() {
