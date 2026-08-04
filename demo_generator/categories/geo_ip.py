@@ -2,7 +2,7 @@
 
 import random
 from . import TestCategory
-from ..primitives import ping, http_to_ip
+from ..primitives import ping, tcp_connect
 
 
 class GeoIp(TestCategory):
@@ -23,22 +23,17 @@ class GeoIp(TestCategory):
                 result.category = self.name
                 result.message = exp_tag + result.message
                 results.append(result)
-                await _short_delay()
+                await _delay()
 
-                result = await http_to_ip(target["ip"], desc, context)
+                result = await tcp_connect(target["ip"], 443, timeout=3)
                 result.category = self.name
                 result.message = exp_tag + result.message
                 results.append(result)
-                await _long_delay()
+                await _delay()
 
         return results
 
 
-async def _short_delay():
+async def _delay():
     import asyncio
-    await asyncio.sleep(random.uniform(1, 2))
-
-
-async def _long_delay():
-    import asyncio
-    await asyncio.sleep(random.uniform(2, 4))
+    await asyncio.sleep(random.uniform(0.5, 1.5))

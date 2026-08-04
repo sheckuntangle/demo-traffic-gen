@@ -97,7 +97,6 @@ class RunManager:
                     self._run_task.cancel()
 
     async def run_single(self, category_name):
-        self.logger.info("SYSTEM", f"Starting single run: {category_name}")
         try:
             engine = Engine(self.config, self.logger, self.stats, pool=self._pool)
             await engine.run_single_category(category_name)
