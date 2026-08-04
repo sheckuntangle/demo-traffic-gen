@@ -165,7 +165,7 @@ class TrafficGeneratorApp(App):
         self._stats = None
         self._engine = None
         self._engine_task = None
-        self._start_time = None
+        self._run_start_time = None
         self._timer_task = None
 
     def compose(self) -> ComposeResult:
@@ -254,9 +254,9 @@ class TrafficGeneratorApp(App):
             pass
 
     async def _update_elapsed(self):
-        while self._start_time:
+        while self._run_start_time:
             try:
-                elapsed = datetime.now() - self._start_time
+                elapsed = datetime.now() - self._run_start_time
                 elapsed_str = str(timedelta(seconds=int(elapsed.total_seconds())))
                 status_bar = self.query_one("#status-bar", StatusBar)
                 status_bar.elapsed = elapsed_str
@@ -285,7 +285,7 @@ class TrafficGeneratorApp(App):
             start_btn.disabled = True
             stop_btn.disabled = False
 
-            self._start_time = datetime.now()
+            self._run_start_time = datetime.now()
             self._engine_task = asyncio.ensure_future(self._run_engine())
             self._timer_task = asyncio.ensure_future(self._update_elapsed())
 
@@ -303,5 +303,5 @@ class TrafficGeneratorApp(App):
         if self._traffic_logger:
             self._traffic_logger.print_summary(self._stats)
             self._traffic_logger.close()
-        self._start_time = None
+        self._run_start_time = None
         self.exit()

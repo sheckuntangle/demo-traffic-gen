@@ -35,7 +35,9 @@ pip install -q -r "$SCRIPT_DIR/requirements.txt"
 echo "[4/4] Installing Playwright Chromium browser (including system deps)..."
 python3 -m playwright install --with-deps chromium
 
+REAL_USER="${SUDO_USER:-$(whoami)}"
 mkdir -p "$SCRIPT_DIR/logs"
+chown -R "$REAL_USER":"$REAL_USER" "$SCRIPT_DIR/logs" "$VENV_DIR"
 
 echo ""
 echo "=== Installation complete ==="
