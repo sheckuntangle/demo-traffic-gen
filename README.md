@@ -5,14 +5,14 @@ Multi-client, long-running traffic generator for populating firewall reporting d
 ## Quick Start
 
 ```bash
-# Install everything (Ubuntu — requires sudo)
+# Install everything (Ubuntu — one time, requires sudo)
 ./install.sh
 
 # Launch with TUI
-python3 -m demo_generator
+./run.sh
 
 # Or run headless (no TUI, console output only)
-python3 -m demo_generator --headless
+./run.sh --headless
 ```
 
 ## What It Does
@@ -48,7 +48,7 @@ Then set `source_ip` in the `client_profiles` section of `config.json`.
 ## CLI Options
 
 ```
-python3 -m demo_generator [OPTIONS]
+./run.sh [OPTIONS]
 
   --config PATH       Config file path (default: config.json)
   --headless          Run without TUI (console-only output)
@@ -63,13 +63,13 @@ python3 -m demo_generator [OPTIONS]
 
 ```bash
 # Run 5 rounds with 2 clients, 60-second intervals
-python3 -m demo_generator --headless --rounds 5 --clients 2 --interval 60
+./run.sh --headless --rounds 5 --clients 2 --interval 60
 
 # Run only DNS filter and geo-IP categories
-python3 -m demo_generator --headless --categories dns_filter,geo_ip
+./run.sh --headless --categories dns_filter,geo_ip
 
 # Run overnight (unlimited rounds, 5-minute intervals)
-python3 -m demo_generator --rounds 0 --interval 300
+./run.sh --rounds 0 --interval 300
 ```
 
 ## TUI Controls
