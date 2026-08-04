@@ -108,6 +108,8 @@ class RunManager:
                 self.config["categories"][key] = data
             else:
                 raise ValueError(f"Unknown category: {key}")
+        elif section == "clients":
+            self.config["client_profiles"] = data
         elif section == "legitimate":
             self.config["legitimate_traffic"].update(data)
         else:
