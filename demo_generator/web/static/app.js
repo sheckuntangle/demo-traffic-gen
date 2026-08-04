@@ -305,6 +305,13 @@ const App = {
                 data[key] = parseInt(el.value) || 0;
             }
         });
+
+        const totalIps = (this.aliasCount || 0) + (this.interfaces || []).filter(i => i.addresses.length > 0).length;
+        if (data.client_count > totalIps && totalIps > 0) {
+            this.showToast(`Client count (${data.client_count}) exceeds available IPs (${totalIps}). Add more IP aliases first.`);
+            return;
+        }
+
         await fetch("/api/config/generator", {
             method: "PUT",
             headers: {"Content-Type": "application/json"},
@@ -324,9 +331,12 @@ const App = {
 
         ifaceSelect.innerHTML = "";
         let html = "";
+        let totalAliases = 0;
 
         for (const iface of interfaces) {
             ifaceSelect.innerHTML += `<option value="${this.esc(iface.name)}">${this.esc(iface.name)}</option>`;
+            const aliasCount = Math.max(0, iface.addresses.length - 1);
+            totalAliases += aliasCount;
 
             html += `<div class="mb-2"><strong>${this.esc(iface.name)}</strong>`;
             if (iface.addresses.length === 0) {
@@ -344,6 +354,10 @@ const App = {
             }
             html += `</div>`;
         }
+
+        this.aliasCount = totalAliases;
+        const totalIps = totalAliases + interfaces.filter(i => i.addresses.length > 0).length;
+        html += `<div class="mt-2 small"><strong>Available IPs:</strong> ${totalIps} total (${interfaces.filter(i => i.addresses.length > 0).length} primary + ${totalAliases} aliases)</div>`;
         container.innerHTML = html;
     },
 
