@@ -24,6 +24,7 @@ GENERATOR_DEFAULTS = {
     "dns_sample_range": [15, 25],
     "web_sample_range": [10, 20],
     "ping_sample_range": [2, 4],
+    "interface": "",
     "log_dir": "./logs",
     "browser_recycle_rounds": 10,
 }

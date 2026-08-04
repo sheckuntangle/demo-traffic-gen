@@ -247,8 +247,8 @@ const App = {
     async loadConfig() {
         const res = await fetch("/api/config");
         this.config = await res.json();
+        await this.loadNetworkInterfaces();
         this.renderGeneratorSettings();
-        this.loadNetworkInterfaces();
         this.renderClientProfiles();
         this.renderCategoryConfigs();
         this.renderLegitConfig();
@@ -265,6 +265,7 @@ const App = {
             {key: "legitimate_interval_seconds", label: "Legitimate Traffic Interval (seconds)", type: "number"},
             {key: "max_rounds", label: "Max Rounds (0 = unlimited)", type: "number"},
             {key: "client_count", label: "Client Count", type: "number"},
+            {key: "interface", label: "Network Interface", type: "interface"},
             {key: "dns_sample_range", label: "DNS Queries per Round (min-max)", type: "range"},
             {key: "web_sample_range", label: "Web Requests per Round (min-max)", type: "range"},
             {key: "ping_sample_range", label: "Pings per Round (min-max)", type: "range"},
@@ -282,6 +283,16 @@ const App = {
                         <input type="number" class="form-control form-control-sm" data-gen="${f.key}" data-idx="0" value="${lo}">
                         <input type="number" class="form-control form-control-sm" data-gen="${f.key}" data-idx="1" value="${hi}">
                     </div>
+                </div>`;
+            } else if (f.type === "interface") {
+                let opts = "";
+                for (const iface of (this.interfaces || [])) {
+                    const sel = (val === iface.name) ? "selected" : "";
+                    opts += `<option value="${this.esc(iface.name)}" ${sel}>${this.esc(iface.name)}</option>`;
+                }
+                html += `<div class="col-md-4">
+                    <label class="form-label small">${f.label}</label>
+                    <select class="form-select form-select-sm" data-gen="${f.key}">${opts}</select>
                 </div>`;
             } else {
                 html += `<div class="col-md-4">
@@ -301,6 +312,8 @@ const App = {
             if (idx !== undefined) {
                 if (!Array.isArray(data[key])) data[key] = [0, 0];
                 data[key][parseInt(idx)] = parseInt(el.value) || 0;
+            } else if (el.tagName === "SELECT") {
+                data[key] = el.value;
             } else {
                 data[key] = parseInt(el.value) || 0;
             }
