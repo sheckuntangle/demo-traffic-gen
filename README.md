@@ -5,11 +5,8 @@ Multi-client, long-running traffic generator for populating firewall reporting d
 ## Quick Start
 
 ```bash
-# Install dependencies
-pip install -r requirements.txt
-
-# Install Playwright browsers
-python3 -m playwright install chromium
+# Install everything (Ubuntu — requires sudo)
+./install.sh
 
 # Launch with TUI
 python3 -m demo_generator
