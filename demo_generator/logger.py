@@ -89,6 +89,22 @@ class Logger:
         }
         self._emit(entry)
 
+    def separator(self, label=""):
+        line = f"{'─' * 80}  {label}" if label else "─" * 80
+        if not self._quiet:
+            print(f"{BLUE}{line}{RESET}\n")
+        self._file_logger.info(line)
+        self._emit({
+            "timestamp": "",
+            "category": "",
+            "test_type": "SEPARATOR",
+            "target": "",
+            "status": "SEP",
+            "message": label,
+            "client_name": "",
+            "round_num": 0,
+        })
+
     def info(self, category, message):
         timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         if not self._quiet:

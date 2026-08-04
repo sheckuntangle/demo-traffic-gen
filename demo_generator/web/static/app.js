@@ -162,18 +162,28 @@ const App = {
     appendLog(entry) {
         const panel = document.getElementById("log-panel");
         const div = document.createElement("div");
-        div.className = "log-line";
 
-        const statusClass = entry.status === "PASS" ? "log-pass" : entry.status === "FAIL" ? "log-fail" : "log-info";
-        const client = entry.client_name ? `[${entry.client_name}] ` : "";
-        const ts = entry.timestamp || "";
-        div.innerHTML = `<span class="text-muted">${this.esc(ts)}</span> `
-            + `<span class="log-info">${this.esc(client)}</span>`
-            + `<span class="log-info">${this.esc(entry.category || "")}</span> | `
-            + `${this.esc(entry.target || "")} | `
-            + `<span class="${statusClass}">${this.esc(entry.status || "")}</span> `
-            + this.esc(entry.message || "");
-        panel.appendChild(div);
+        if (entry.test_type === "SEPARATOR") {
+            div.className = "log-separator";
+            const label = entry.message ? ` ${this.esc(entry.message)} ` : "";
+            div.innerHTML = `<span class="text-muted">${"─".repeat(40)}${label}${"─".repeat(Math.max(0, 40 - label.length))}</span>`;
+            panel.appendChild(div);
+            panel.appendChild(document.createElement("br"));
+            this.logCount += 2;
+        } else {
+            div.className = "log-line";
+            const statusClass = entry.status === "PASS" ? "log-pass" : entry.status === "FAIL" ? "log-fail" : "log-info";
+            const client = entry.client_name ? `[${entry.client_name}] ` : "";
+            const ts = entry.timestamp || "";
+            div.innerHTML = `<span class="text-muted">${this.esc(ts)}</span> `
+                + `<span class="log-info">${this.esc(client)}</span>`
+                + `<span class="log-info">${this.esc(entry.category || "")}</span> | `
+                + `${this.esc(entry.target || "")} | `
+                + `<span class="${statusClass}">${this.esc(entry.status || "")}</span> `
+                + this.esc(entry.message || "");
+            panel.appendChild(div);
+            this.logCount++;
+        }
 
         this.logCount++;
         while (this.logCount > MAX_LOG_LINES) {

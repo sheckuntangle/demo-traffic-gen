@@ -279,6 +279,8 @@ class Engine:
                 self._stats.record(category.name, result.success)
                 self._emit("on_test_complete", result=result)
 
+            self._logger.separator(category.display_name)
+
     # --- Single-category run (for "Run Now" from GUI) ---
 
     async def run_single_category(self, category_name):
@@ -290,6 +292,7 @@ class Engine:
         await self._pool.start()
         self._logger.info("SYSTEM", f"Running single category: {cat_cls.display_name}")
         await self._run_categories_on_clients([cat_cls()])
+        self._logger.info("SYSTEM", f"Single category run complete: {cat_cls.display_name}")
         self._logger.info("SYSTEM", f"Single category run complete: {cat_cls.display_name}")
 
     async def cleanup(self):
