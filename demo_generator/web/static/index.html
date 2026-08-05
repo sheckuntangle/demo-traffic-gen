@@ -32,38 +32,40 @@
 
     <div class="tab-content mt-3">
         <!-- Dashboard Tab -->
-        <div class="tab-pane show active d-flex flex-column" id="dashboard-tab" style="height: calc(100vh - 120px)">
-            <!-- Controls -->
-            <div class="card mb-2 flex-shrink-0">
-                <div class="card-body d-flex align-items-center gap-3 flex-wrap py-2">
-                    <select id="mode-select" class="form-select" style="width:auto">
-                        <option value="full">Full Run (legit + periodic triggers)</option>
-                        <option value="triggers">Triggers Only (all categories per round)</option>
-                        <option value="legit">Legitimate Only (clean traffic)</option>
-                    </select>
-                    <button id="start-btn" class="btn btn-success" onclick="App.start()">Start</button>
-                    <button id="stop-btn" class="btn btn-danger" onclick="App.stop()" disabled>Stop</button>
-                    <span id="mode-info" class="text-muted small"></span>
-                </div>
-            </div>
-
-            <!-- Stats Cards -->
-            <div id="stats-grid" class="row row-cols-3 row-cols-md-5 row-cols-xl-9 g-2 mb-2 flex-shrink-0"></div>
-
-            <!-- Log Panel -->
-            <div class="card flex-grow-1 d-flex flex-column" style="min-height:0">
-                <div class="card-header d-flex justify-content-between align-items-center flex-shrink-0">
-                    <span>Live Log</span>
-                    <div class="d-flex gap-2">
-                        <div class="form-check form-switch">
-                            <input class="form-check-input" type="checkbox" id="autoscroll-toggle" checked>
-                            <label class="form-check-label small" for="autoscroll-toggle">Auto-scroll</label>
-                        </div>
-                        <button class="btn btn-sm btn-outline-light" onclick="App.copyLog()">Copy</button>
-                        <button class="btn btn-sm btn-outline-light" onclick="App.clearLog()">Clear</button>
+        <div class="tab-pane show active" id="dashboard-tab">
+            <div class="d-flex flex-column" style="height: calc(100vh - 120px)">
+                <!-- Controls -->
+                <div class="card mb-2 flex-shrink-0">
+                    <div class="card-body d-flex align-items-center gap-3 flex-wrap py-2">
+                        <select id="mode-select" class="form-select" style="width:auto">
+                            <option value="full">Full Run (legit + periodic triggers)</option>
+                            <option value="triggers">Triggers Only (all categories per round)</option>
+                            <option value="legit">Legitimate Only (clean traffic)</option>
+                        </select>
+                        <button id="start-btn" class="btn btn-success" onclick="App.start()">Start</button>
+                        <button id="stop-btn" class="btn btn-danger" onclick="App.stop()" disabled>Stop</button>
+                        <span id="mode-info" class="text-muted small"></span>
                     </div>
                 </div>
-                <div id="log-panel" class="flex-grow-1"></div>
+
+                <!-- Stats Cards -->
+                <div id="stats-grid" class="row row-cols-3 row-cols-md-5 row-cols-xl-9 g-2 mb-2 flex-shrink-0"></div>
+
+                <!-- Log Panel -->
+                <div class="card flex-grow-1 d-flex flex-column" style="min-height:0">
+                    <div class="card-header d-flex justify-content-between align-items-center flex-shrink-0">
+                        <span>Live Log</span>
+                        <div class="d-flex gap-2">
+                            <div class="form-check form-switch">
+                                <input class="form-check-input" type="checkbox" id="autoscroll-toggle" checked>
+                                <label class="form-check-label small" for="autoscroll-toggle">Auto-scroll</label>
+                            </div>
+                            <button class="btn btn-sm btn-outline-light" onclick="App.copyLog()">Copy</button>
+                            <button class="btn btn-sm btn-outline-light" onclick="App.clearLog()">Clear</button>
+                        </div>
+                    </div>
+                    <div id="log-panel" class="flex-grow-1"></div>
+                </div>
             </div>
         </div>
 
