@@ -217,10 +217,29 @@ const App = {
     copyLog() {
         const panel = document.getElementById("log-panel");
         const text = panel.innerText;
-        navigator.clipboard.writeText(text).then(
-            () => this.showToast("Logs copied to clipboard"),
-            () => this.showToast("Failed to copy"),
-        );
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+            navigator.clipboard.writeText(text).then(
+                () => this.showToast("Logs copied to clipboard"),
+                () => this._fallbackCopy(text),
+            );
+        } else {
+            this._fallbackCopy(text);
+        }
+    },
+
+    _fallbackCopy(text) {
+        const ta = document.createElement("textarea");
+        ta.value = text;
+        ta.style.cssText = "position:fixed;left:-9999px";
+        document.body.appendChild(ta);
+        ta.select();
+        try {
+            document.execCommand("copy");
+            this.showToast("Logs copied to clipboard");
+        } catch (e) {
+            this.showToast("Failed to copy");
+        }
+        document.body.removeChild(ta);
     },
 
     clearLog() {
@@ -667,10 +686,15 @@ const App = {
     },
 
     async saveDockerConfig() {
+        const subnet = document.getElementById("docker-subnet").value.trim();
+        if (subnet && !subnet.match(/^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}\/\d{1,2}$/)) {
+            this.showToast("Subnet must be in CIDR format (e.g. 192.168.41.0/24)");
+            return;
+        }
         const data = {
             enabled: document.getElementById("docker-enabled").checked,
             parent_interface: document.getElementById("docker-parent-iface").value,
-            subnet: document.getElementById("docker-subnet").value.trim(),
+            subnet: subnet,
             gateway: document.getElementById("docker-gateway").value.trim(),
             start_ip: document.getElementById("docker-start-ip").value.trim(),
             client_count: parseInt(document.getElementById("docker-client-count").value) || 3,

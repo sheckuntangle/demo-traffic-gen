@@ -83,6 +83,8 @@ class DockerNetworkManager:
 
         if not parent_iface or not subnet or not gateway:
             raise ValueError("parent_interface, subnet, and gateway are required")
+        if "/" not in subnet:
+            raise ValueError(f"Subnet must be in CIDR format (e.g. 192.168.41.0/24), got: {subnet}")
 
         macvlan = self.get_macvlan_network()
         if macvlan:
