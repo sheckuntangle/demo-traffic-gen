@@ -189,6 +189,8 @@ class DockerClientPool:
             name = profile_data.get("name", f"client-{i + 1}")
             containers_conf.append({"name": name, "ip": ips[i], "profile_data": profile_data})
 
+        await asyncio.to_thread(self._remove_stale_containers)
+
         tasks = [
             self._start_container(c, image_name, macvlan, mgmt)
             for c in containers_conf
@@ -201,6 +203,14 @@ class DockerClientPool:
                 self._clients.append(r)
 
         logger.info(f"Started {len(self._clients)} Docker client(s)")
+
+    def _remove_stale_containers(self):
+        for c in self._docker.containers.list(all=True, filters={"name": CONTAINER_PREFIX}):
+            try:
+                c.remove(force=True)
+                logger.info(f"Removed stale container '{c.name}'")
+            except Exception as e:
+                logger.warning(f"Could not remove '{c.name}': {e}")
 
     async def _start_container(self, container_conf, image_name, macvlan, mgmt):
         name = container_conf["name"]
@@ -218,12 +228,6 @@ class DockerClientPool:
             "WORKER_TIMEZONE": profile_data.get("timezone", "America/New_York"),
             "WORKER_LOCALE": profile_data.get("locale", "en-US"),
         }
-
-        try:
-            existing = self._docker.containers.get(container_name)
-            existing.remove(force=True)
-        except Exception:
-            pass
 
         network_name = self._config["docker"].get("network_name", "demogen-macvlan")
 
