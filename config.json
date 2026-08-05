@@ -4,18 +4,29 @@
     "legitimate_interval_seconds": 45,
     "max_rounds": 0,
     "client_count": 3,
-    "dns_sample_range": [15, 25],
-    "web_sample_range": [10, 20],
-    "ping_sample_range": [2, 4],
+    "dns_sample_range": [
+      15,
+      25
+    ],
+    "web_sample_range": [
+      10,
+      20
+    ],
+    "ping_sample_range": [
+      2,
+      4
+    ],
     "log_dir": "./logs",
     "browser_recycle_rounds": 10
   },
-
   "client_profiles": [
     {
       "name": "workstation-win10",
       "user_agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
-      "viewport": {"width": 1920, "height": 1080},
+      "viewport": {
+        "width": 1920,
+        "height": 1080
+      },
       "timezone": "America/New_York",
       "locale": "en-US",
       "source_ip": null
@@ -23,7 +34,10 @@
     {
       "name": "laptop-macos",
       "user_agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
-      "viewport": {"width": 1440, "height": 900},
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
       "timezone": "America/Chicago",
       "locale": "en-US",
       "source_ip": null
@@ -31,7 +45,10 @@
     {
       "name": "desktop-linux",
       "user_agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
-      "viewport": {"width": 2560, "height": 1440},
+      "viewport": {
+        "width": 2560,
+        "height": 1440
+      },
       "timezone": "America/Los_Angeles",
       "locale": "en-US",
       "source_ip": null
@@ -39,7 +56,10 @@
     {
       "name": "laptop-win11",
       "user_agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:121.0) Gecko/20100101 Firefox/121.0",
-      "viewport": {"width": 1366, "height": 768},
+      "viewport": {
+        "width": 1366,
+        "height": 768
+      },
       "timezone": "America/Denver",
       "locale": "en-US",
       "source_ip": null
@@ -47,147 +67,325 @@
     {
       "name": "workstation-edge",
       "user_agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36 Edg/131.0.0.0",
-      "viewport": {"width": 1680, "height": 1050},
+      "viewport": {
+        "width": 1680,
+        "height": 1050
+      },
       "timezone": "America/New_York",
       "locale": "en-US",
       "source_ip": null
     }
   ],
-
   "categories": {
     "app_control": {
       "enabled": true,
       "ssh_targets": [
-        {"host": "github.com", "port": 22, "description": "GitHub SSH", "expected": "block+alert"}
+        {
+          "host": "github.com",
+          "port": 22,
+          "description": "GitHub SSH",
+          "expected": "block+alert"
+        }
       ],
       "web_targets": [
-        {"url": "https://www.facebook.com", "description": "Facebook", "expected": "reject+alert"},
-        {"url": "https://mail.google.com", "description": "Gmail", "expected": "alert+log"}
+        {
+          "url": "https://www.facebook.com",
+          "description": "Facebook",
+          "expected": "reject+alert"
+        },
+        {
+          "url": "https://mail.google.com",
+          "description": "Gmail",
+          "expected": "alert+log"
+        }
       ]
     },
-
     "dns_filter": {
       "enabled": true,
       "targets": [
-        {"domain": "mlb.com", "expected": "block+alert"},
-        {"domain": "nfl.com", "expected": "reject+alert"},
-        {"domain": "nba.com", "expected": "alert"}
+        {
+          "domain": "mlb.com",
+          "expected": "block+alert"
+        },
+        {
+          "domain": "nfl.com",
+          "expected": "reject+alert"
+        },
+        {
+          "domain": "nba.com",
+          "expected": "alert"
+        }
       ]
     },
-
     "geo_ip": {
       "enabled": true,
       "countries": {
         "france": {
           "expected": "block+alert",
           "targets": [
-            {"ip": "51.15.0.1", "description": "Scaleway France"},
-            {"ip": "163.172.0.1", "description": "Online SAS France"},
-            {"ip": "195.154.0.1", "description": "Online SAS France"}
+            {
+              "ip": "51.15.0.1",
+              "description": "Scaleway France"
+            },
+            {
+              "ip": "163.172.0.1",
+              "description": "Online SAS France"
+            },
+            {
+              "ip": "195.154.0.1",
+              "description": "Online SAS France"
+            }
           ]
         },
         "switzerland": {
           "expected": "reject+alert",
           "targets": [
-            {"ip": "82.197.164.1", "description": "Infomaniak Switzerland"},
-            {"ip": "185.144.100.1", "description": "Swiss Hosting"},
-            {"ip": "178.209.52.1", "description": "Interxion Zurich"}
+            {
+              "ip": "82.197.164.1",
+              "description": "Infomaniak Switzerland"
+            },
+            {
+              "ip": "185.144.100.1",
+              "description": "Swiss Hosting"
+            },
+            {
+              "ip": "178.209.52.1",
+              "description": "Interxion Zurich"
+            }
           ]
         },
         "sweden": {
           "expected": "alert",
           "targets": [
-            {"ip": "46.246.93.1", "description": "GleSYS Sweden"},
-            {"ip": "178.174.128.1", "description": "Bahnhof Sweden"},
-            {"ip": "185.65.134.1", "description": "Resilans AB Sweden"}
+            {
+              "ip": "46.246.93.1",
+              "description": "GleSYS Sweden"
+            },
+            {
+              "ip": "178.174.128.1",
+              "description": "Bahnhof Sweden"
+            },
+            {
+              "ip": "185.65.134.1",
+              "description": "Resilans AB Sweden"
+            }
           ]
         }
       }
     },
-
     "web_filter": {
       "enabled": true,
       "targets": [
-        {"url": "https://www.weedmaps.com", "category": "marijuana", "expected": "block+alert"},
-        {"url": "https://www.amazon.com", "category": "shopping", "expected": "reject+alert"},
-        {"url": "https://www.espn.com", "category": "sports", "expected": "alert"}
+        {
+          "url": "https://www.weedmaps.com",
+          "category": "marijuana",
+          "expected": "block+alert"
+        },
+        {
+          "url": "https://www.amazon.com",
+          "category": "shopping",
+          "expected": "reject+alert"
+        },
+        {
+          "url": "https://www.espn.com",
+          "category": "sports",
+          "expected": "alert"
+        }
       ]
     },
-
     "dynamic_blocklist": {
       "enabled": true,
       "ip_targets": [
-        {"ip": "208.67.222.222", "description": "OpenDNS", "expected": "block+alert"}
+        {
+          "ip": "208.67.222.222",
+          "description": "OpenDNS",
+          "expected": "block+alert"
+        }
       ],
       "domain_targets": [
-        {"domain": "www.ebay.com", "description": "eBay", "expected": "block+alert"},
-        {"domain": "www.wikipedia.org", "description": "Wikipedia", "expected": "block+alert"}
+        {
+          "domain": "www.ebay.com",
+          "description": "eBay",
+          "expected": "block+alert"
+        },
+        {
+          "domain": "www.wikipedia.org",
+          "description": "Wikipedia",
+          "expected": "block+alert"
+        }
       ]
     },
-
     "security": {
       "enabled": true,
       "targets": [
-        {"ip": "9.9.9.9", "description": "Quad9", "expected": "block+alert"}
+        {
+          "ip": "9.9.9.9",
+          "description": "Quad9",
+          "expected": "block+alert"
+        }
       ]
     },
-
     "ip_reputation": {
       "enabled": true,
       "_note": "IPs that BrightCloud classifies as malicious. Update by checking brightcloud.com/tools/url-ip-lookup.php or pulling from abuse.ch Feodo Tracker / Spamhaus DROP lists.",
       "targets": [
-        {"ip": "198.51.100.1", "description": "PLACEHOLDER - verify with BrightCloud", "expected": "block+alert"}
+        {
+          "ip": "198.51.100.1",
+          "description": "PLACEHOLDER - verify with BrightCloud",
+          "expected": "block+alert"
+        }
       ]
     },
-
     "url_reputation": {
       "enabled": true,
       "_note": "URLs that BrightCloud classifies as high risk. Update by checking brightcloud.com/tools/url-ip-lookup.php or pulling from URLhaus (abuse.ch) / PhishTank.",
       "targets": [
-        {"url": "http://malware.testing.google.test/testing/malware/", "description": "PLACEHOLDER - verify with BrightCloud", "expected": "block+alert"}
+        {
+          "url": "http://malware.testing.google.test/testing/malware/",
+          "description": "PLACEHOLDER - verify with BrightCloud",
+          "expected": "block+alert"
+        }
       ]
+    },
+    "idps": {
+      "enabled": true,
+      "script": "#!/bin/sh\nsleep 2\n\n# ==========================================\n# ALERT TESTS (Using Reliable URI Triggers)\n# ==========================================\necho \"========================================\"\necho \" RUNNING ALERT TESTS\"\necho \"========================================\"\necho \"\"\n\necho \"Test A1: SID 2049400 - /etc/passwd Detected in URI\"\ncurl -s \"http://example.com/etc/passwd\" > /dev/null 2>&1\necho \"-> Request sent\"\necho \"\"\nsleep 2\n\necho \"Test A2: SID 2033891 - Observed Suspicious Request nc.exe in URI\"\ncurl -s \"http://example.com/nc.exe\" > /dev/null 2>&1\necho \"-> Request sent\"\necho \"\"\nsleep 2\n\necho \"Test A3: SID 2029923 - IP Check (ip.jsontest.com)\"\ncurl -s \"http://ip.jsontest.com/\" > /dev/null 2>&1\necho \"-> Request sent\"\necho \"\"\nsleep 2\n\n# ==========================================\n# REJECT TESTS (Using Reliable SQLi Triggers)\n# ==========================================\necho \"========================================\"\necho \" RUNNING REJECT TESTS\"\necho \"========================================\"\necho \"\"\n\necho \"Test R1: SID 2007337 - UNION SELECT SQL Injection\"\ncurl -s -m 5 \"http://example.com/index.php?pageid=1%20UNION%20SELECT%20username,password\" > /dev/null 2>&1\necho \"-> Request sent\"\necho \"\"\nsleep 2\n\necho \"Test R2: SID 2006124 - detail.asp UNION SELECT SQL Injection\"\ncurl -s -m 5 \"http://example.com/detail.asp?ID=1%20UNION%20SELECT%20username,password\" > /dev/null 2>&1\necho \"-> Request sent\"\necho \"\"\nsleep 2\n\necho \"Test R3: SID 2005082 - faq.php UNION SELECT SQL Injection\"\ncurl -s -m 5 \"http://example.com/faq.php?id=1%20UNION%20SELECT%20username,password\" > /dev/null 2>&1\necho \"-> Request sent\"\necho \"\"\n\necho \"Testing complete.\"\n"
     }
   },
-
   "legitimate_traffic": {
     "dns_domains": [
-      "bbc.co.uk", "cnn.com", "wikipedia.org", "github.com", "stackoverflow.com",
-      "reddit.com", "nytimes.com", "theguardian.com", "reuters.com", "bloomberg.com",
-      "weather.com", "imdb.com", "linkedin.com", "microsoft.com", "apple.com",
-      "adobe.com", "netflix.com", "spotify.com", "twitch.tv", "discord.com",
-      "slack.com", "zoom.us", "dropbox.com", "salesforce.com", "oracle.com",
-      "dell.com", "hp.com", "bbc.com", "spiegel.de", "lemonde.fr",
-      "elpais.com", "corriere.it", "asahi.com", "smh.com.au", "cbc.ca",
-      "timesofindia.com", "globo.com", "mozilla.org", "python.org", "nodejs.org",
-      "docker.com", "kubernetes.io", "aws.amazon.com", "cloud.google.com", "azure.microsoft.com",
-      "elastic.co", "grafana.com", "datadog.com", "pagerduty.com", "atlassian.com",
-      "notion.so", "figma.com", "canva.com", "medium.com", "substack.com",
-      "npr.org", "bbc.co.uk", "apnews.com", "washingtonpost.com", "wsj.com"
+      "bbc.co.uk",
+      "cnn.com",
+      "wikipedia.org",
+      "github.com",
+      "stackoverflow.com",
+      "reddit.com",
+      "nytimes.com",
+      "theguardian.com",
+      "reuters.com",
+      "bloomberg.com",
+      "weather.com",
+      "imdb.com",
+      "linkedin.com",
+      "microsoft.com",
+      "apple.com",
+      "adobe.com",
+      "netflix.com",
+      "spotify.com",
+      "twitch.tv",
+      "discord.com",
+      "slack.com",
+      "zoom.us",
+      "dropbox.com",
+      "salesforce.com",
+      "oracle.com",
+      "dell.com",
+      "hp.com",
+      "bbc.com",
+      "spiegel.de",
+      "lemonde.fr",
+      "elpais.com",
+      "corriere.it",
+      "asahi.com",
+      "smh.com.au",
+      "cbc.ca",
+      "timesofindia.com",
+      "globo.com",
+      "mozilla.org",
+      "python.org",
+      "nodejs.org",
+      "docker.com",
+      "kubernetes.io",
+      "aws.amazon.com",
+      "cloud.google.com",
+      "azure.microsoft.com",
+      "elastic.co",
+      "grafana.com",
+      "datadog.com",
+      "pagerduty.com",
+      "atlassian.com",
+      "notion.so",
+      "figma.com",
+      "canva.com",
+      "medium.com",
+      "substack.com",
+      "npr.org",
+      "bbc.co.uk",
+      "apnews.com",
+      "washingtonpost.com",
+      "wsj.com"
     ],
     "web_urls": [
-      "https://www.bbc.co.uk", "https://www.cnn.com", "https://www.wikipedia.org",
-      "https://github.com", "https://stackoverflow.com", "https://www.reddit.com",
-      "https://www.nytimes.com", "https://www.theguardian.com", "https://www.reuters.com",
-      "https://www.bloomberg.com", "https://www.weather.com", "https://www.imdb.com",
-      "https://www.linkedin.com", "https://www.microsoft.com", "https://www.apple.com",
-      "https://www.adobe.com", "https://www.netflix.com", "https://www.spotify.com",
-      "https://www.twitch.tv", "https://www.discord.com", "https://slack.com",
-      "https://zoom.us", "https://www.dropbox.com", "https://www.salesforce.com",
-      "https://www.oracle.com", "https://www.dell.com", "https://www.hp.com",
-      "https://www.bbc.com", "https://www.spiegel.de", "https://www.lemonde.fr",
-      "https://www.elpais.com", "https://www.corriere.it", "https://www.asahi.com",
-      "https://www.smh.com.au", "https://www.cbc.ca", "https://timesofindia.indiatimes.com",
-      "https://www.globo.com", "https://www.mozilla.org", "https://www.python.org",
-      "https://www.docker.com", "https://www.elastic.co", "https://www.atlassian.com",
-      "https://www.notion.so", "https://www.figma.com", "https://www.medium.com",
-      "https://www.npr.org", "https://apnews.com", "https://www.washingtonpost.com"
+      "https://www.bbc.co.uk",
+      "https://www.cnn.com",
+      "https://www.wikipedia.org",
+      "https://github.com",
+      "https://stackoverflow.com",
+      "https://www.reddit.com",
+      "https://www.nytimes.com",
+      "https://www.theguardian.com",
+      "https://www.reuters.com",
+      "https://www.bloomberg.com",
+      "https://www.weather.com",
+      "https://www.imdb.com",
+      "https://www.linkedin.com",
+      "https://www.microsoft.com",
+      "https://www.apple.com",
+      "https://www.adobe.com",
+      "https://www.netflix.com",
+      "https://www.spotify.com",
+      "https://www.twitch.tv",
+      "https://www.discord.com",
+      "https://slack.com",
+      "https://zoom.us",
+      "https://www.dropbox.com",
+      "https://www.salesforce.com",
+      "https://www.oracle.com",
+      "https://www.dell.com",
+      "https://www.hp.com",
+      "https://www.bbc.com",
+      "https://www.spiegel.de",
+      "https://www.lemonde.fr",
+      "https://www.elpais.com",
+      "https://www.corriere.it",
+      "https://www.asahi.com",
+      "https://www.smh.com.au",
+      "https://www.cbc.ca",
+      "https://timesofindia.indiatimes.com",
+      "https://www.globo.com",
+      "https://www.mozilla.org",
+      "https://www.python.org",
+      "https://www.docker.com",
+      "https://www.elastic.co",
+      "https://www.atlassian.com",
+      "https://www.notion.so",
+      "https://www.figma.com",
+      "https://www.medium.com",
+      "https://www.npr.org",
+      "https://apnews.com",
+      "https://www.washingtonpost.com"
     ],
     "ping_targets": [
-      {"name": "Google DNS Primary", "ip": "8.8.8.8"},
-      {"name": "Google DNS Secondary", "ip": "8.8.4.4"},
-      {"name": "Cloudflare DNS", "ip": "1.1.1.1"},
-      {"name": "Cloudflare Secondary", "ip": "1.0.0.1"},
-      {"name": "OpenDNS Secondary", "ip": "208.67.220.220"}
+      {
+        "name": "Google DNS Primary",
+        "ip": "8.8.8.8"
+      },
+      {
+        "name": "Google DNS Secondary",
+        "ip": "8.8.4.4"
+      },
+      {
+        "name": "Cloudflare DNS",
+        "ip": "1.1.1.1"
+      },
+      {
+        "name": "Cloudflare Secondary",
+        "ip": "1.0.0.1"
+      },
+      {
+        "name": "OpenDNS Secondary",
+        "ip": "208.67.220.220"
+      }
     ]
   }
 }

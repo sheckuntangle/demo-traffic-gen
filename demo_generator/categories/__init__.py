@@ -37,5 +37,6 @@ from . import (
     security,
     ip_reputation,
     url_reputation,
+    idps,
     legitimate,
 )

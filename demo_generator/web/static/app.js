@@ -7,6 +7,7 @@ const CATEGORY_DISPLAY = {
     security: "Security",
     ip_reputation: "IP Reputation",
     url_reputation: "URL Reputation",
+    idps: "IDPS",
     legitimate: "Legitimate Traffic",
 };
 
@@ -424,7 +425,7 @@ const App = {
 
     renderCategoryConfigs() {
         const accordion = document.getElementById("category-accordion");
-        const order = ["ip_reputation", "url_reputation", "app_control", "dns_filter", "geo_ip", "web_filter", "dynamic_blocklist", "security"];
+        const order = ["ip_reputation", "url_reputation", "app_control", "dns_filter", "geo_ip", "web_filter", "dynamic_blocklist", "security", "idps"];
         let html = "";
 
         for (const name of order) {
@@ -447,7 +448,9 @@ const App = {
                             <label class="form-check-label" for="enable-${name}">Enabled</label>
                         </div>`;
 
-            if (name === "geo_ip") {
+            if (name === "idps") {
+                html += this.renderIdpsConfig(catConfig);
+            } else if (name === "geo_ip") {
                 html += this.renderGeoIpConfig(catConfig);
             } else if (schema) {
                 for (const section of schema) {
@@ -473,6 +476,14 @@ const App = {
             html += this.renderTargetTable("geo_ip", `countries.${country}.targets`, ["ip", "description"], data.targets || []);
         }
         return html;
+    },
+
+    renderIdpsConfig(catConfig) {
+        const script = catConfig.script || "";
+        const lines = script.split("\n").length;
+        return `<h6>Test Script</h6>
+            <p class="text-muted small">Shell script executed to trigger IDS/IPS signatures. Lines starting with "Test " are parsed as individual test results.</p>
+            <textarea class="form-control form-control-sm font-monospace" id="idps-script" rows="${Math.min(30, Math.max(10, lines + 2))}" style="font-size:12px">${this.esc(script)}</textarea>`;
     },
 
     renderTargetTable(catName, sectionKey, fields, items) {
@@ -511,7 +522,9 @@ const App = {
         catConfig.enabled = document.getElementById(`enable-${name}`).checked;
 
         const schema = CATEGORY_SCHEMAS[name];
-        if (name === "geo_ip") {
+        if (name === "idps") {
+            catConfig.script = document.getElementById("idps-script").value;
+        } else if (name === "geo_ip") {
             for (const [country, data] of Object.entries(catConfig.countries || {})) {
                 const tableId = `table-geo_ip-countries-${country}-targets`;
                 catConfig.countries[country].targets = this.readTable(tableId);

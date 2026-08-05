@@ -14,6 +14,7 @@ REQUIRED_CATEGORY_KEYS = {
     "security": ["targets"],
     "ip_reputation": ["targets"],
     "url_reputation": ["targets"],
+    "idps": ["script"],
 }
 
 GENERATOR_DEFAULTS = {
