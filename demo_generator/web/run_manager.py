@@ -61,14 +61,21 @@ class RunManager:
     def get_stats(self):
         return self.stats.get_cumulative()
 
+    async def _get_active_pool(self):
+        if self.config.get("docker", {}).get("enabled"):
+            pool = self.get_docker_pool()
+            if not pool.is_started:
+                self.logger.info("SYSTEM", "Starting Docker containers...")
+                await pool.start()
+            return pool
+        return self._pool
+
     async def start(self, mode="full"):
         if self._engine and self._engine.is_running:
             raise RuntimeError("Engine is already running")
 
         self._mode = RunMode(mode)
-        pool = self._pool
-        if self.config.get("docker", {}).get("enabled") and self._docker_pool and self._docker_pool.is_started:
-            pool = self._docker_pool
+        pool = await self._get_active_pool()
         self._engine = Engine(self.config, self.logger, self.stats, pool=pool)
 
         self._engine.on("on_round_start", lambda **kw: self.broadcast({
@@ -99,10 +106,14 @@ class RunManager:
                     await asyncio.wait_for(self._run_task, timeout=30)
                 except asyncio.TimeoutError:
                     self._run_task.cancel()
+        if self._docker_pool and self._docker_pool.is_started:
+            self.logger.info("SYSTEM", "Stopping Docker containers...")
+            await self._docker_pool.cleanup()
 
     async def run_single(self, category_name):
         try:
-            engine = Engine(self.config, self.logger, self.stats, pool=self._pool)
+            pool = await self._get_active_pool()
+            engine = Engine(self.config, self.logger, self.stats, pool=pool)
             await engine.run_single_category(category_name)
         except Exception as e:
             self.logger.info("ERROR", f"Single run error ({category_name}): {type(e).__name__}: {e}")

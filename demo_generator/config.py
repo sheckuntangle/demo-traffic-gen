@@ -36,8 +36,9 @@ DOCKER_DEFAULTS = {
     "parent_interface": "",
     "subnet": "",
     "gateway": "",
+    "start_ip": "",
+    "client_count": 3,
     "worker_port": 8090,
-    "containers": [],
 }
 
 

@@ -338,12 +338,6 @@ const App = {
             }
         });
 
-        const totalIps = (this.aliasCount || 0) + (this.interfaces || []).filter(i => i.addresses.length > 0).length;
-        if (data.client_count > totalIps && totalIps > 0) {
-            this.showToast(`Client count (${data.client_count}) exceeds available IPs (${totalIps}). Add more IP aliases first.`);
-            return;
-        }
-
         await fetch("/api/config/generator", {
             method: "PUT",
             headers: {"Content-Type": "application/json"},
@@ -355,118 +349,13 @@ const App = {
 
     async loadNetworkInterfaces() {
         const res = await fetch("/api/network/interfaces");
-        const interfaces = await res.json();
-        this.interfaces = interfaces;
-
-        const container = document.getElementById("network-interfaces");
-        const ifaceSelect = document.getElementById("add-ip-iface");
-
-        ifaceSelect.innerHTML = "";
-        let html = "";
-        let totalAliases = 0;
-
-        for (const iface of interfaces) {
-            ifaceSelect.innerHTML += `<option value="${this.esc(iface.name)}">${this.esc(iface.name)}</option>`;
-            const aliasCount = Math.max(0, iface.addresses.length - 1);
-            totalAliases += aliasCount;
-
-            html += `<div class="mb-2"><strong>${this.esc(iface.name)}</strong>`;
-            if (iface.addresses.length === 0) {
-                html += ` <span class="text-muted small">no IPv4 addresses</span>`;
-            } else {
-                html += `<div class="d-flex flex-wrap gap-2 mt-1">`;
-                for (const addr of iface.addresses) {
-                    const isPrimary = iface.addresses.indexOf(addr) === 0;
-                    const badge = isPrimary ? "bg-primary" : "bg-info";
-                    const removeBtn = isPrimary ? ""
-                        : ` <button class="btn btn-sm btn-link text-danger p-0 ms-1" onclick="App.removeIpAlias('${this.esc(iface.name)}', '${this.esc(addr.ip)}', ${addr.prefix})" title="Remove">&times;</button>`;
-                    html += `<span class="badge ${badge}">${this.esc(addr.ip)}/${addr.prefix}${removeBtn}</span>`;
-                }
-                html += `</div>`;
-            }
-            html += `</div>`;
-        }
-
-        this.aliasCount = totalAliases;
-        const totalIps = totalAliases + interfaces.filter(i => i.addresses.length > 0).length;
-        html += `<div class="mt-2 small"><strong>Available IPs:</strong> ${totalIps} total (${interfaces.filter(i => i.addresses.length > 0).length} primary + ${totalAliases} aliases)</div>`;
-        container.innerHTML = html;
-    },
-
-    parseIpInput(input) {
-        input = input.trim();
-        const rangeMatch = input.match(/^(\d{1,3}\.\d{1,3}\.\d{1,3}\.)(\d{1,3})-(\d{1,3})$/);
-        if (rangeMatch) {
-            const base = rangeMatch[1];
-            const start = parseInt(rangeMatch[2]);
-            const end = parseInt(rangeMatch[3]);
-            if (start > end || start < 0 || end > 255) return [];
-            const ips = [];
-            for (let i = start; i <= end; i++) ips.push(base + i);
-            return ips;
-        }
-        if (/^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(input)) return [input];
-        return [];
-    },
-
-    async addIpAlias() {
-        const iface = document.getElementById("add-ip-iface").value;
-        const input = document.getElementById("add-ip-addr").value.trim();
-        const prefix = parseInt(document.getElementById("add-ip-prefix").value) || 24;
-        if (!input) return;
-
-        const ips = this.parseIpInput(input);
-        if (ips.length === 0) {
-            this.showToast("Invalid IP or range format");
-            return;
-        }
-
-        let added = 0;
-        let lastErr = "";
-        for (const ip of ips) {
-            const res = await fetch("/api/network/add-ip", {
-                method: "POST",
-                headers: {"Content-Type": "application/json"},
-                body: JSON.stringify({interface: iface, ip, prefix}),
-            });
-            if (res.ok) {
-                added++;
-            } else {
-                const err = await res.json();
-                lastErr = err.detail || "Failed";
-            }
-        }
-
-        document.getElementById("add-ip-addr").value = "";
-        if (added === ips.length) {
-            this.showToast(`Added ${added} IP${added > 1 ? "s" : ""} to ${iface}`);
-        } else if (added > 0) {
-            this.showToast(`Added ${added}/${ips.length} IPs (last error: ${lastErr})`);
-        } else {
-            this.showToast(`Error: ${lastErr}`);
-        }
-        this.loadNetworkInterfaces();
-    },
-
-    async removeIpAlias(iface, ip, prefix) {
-        const res = await fetch("/api/network/remove-ip", {
-            method: "POST",
-            headers: {"Content-Type": "application/json"},
-            body: JSON.stringify({interface: iface, ip, prefix}),
-        });
-        if (res.ok) {
-            this.showToast(`Removed ${ip} from ${iface}`);
-            this.loadNetworkInterfaces();
-        } else {
-            const err = await res.json();
-            this.showToast(`Error: ${err.detail || "Failed"}`);
-        }
+        this.interfaces = await res.json();
     },
 
     renderClientProfiles() {
         const profiles = this.config.client_profiles || [];
         const container = document.getElementById("client-profiles-config");
-        let html = `<p class="text-muted small">Each client simulates a different user with a unique browser fingerprint. Set <code>source_ip</code> to an IP alias added above for real source IP diversity in firewall reports.</p>`;
+        let html = `<p class="text-muted small">Each client simulates a different user with a unique browser fingerprint. In Docker mode, profiles are cycled across containers automatically.</p>`;
 
         html += `<table class="table table-sm target-table" id="table-client-profiles">
             <thead><tr>
@@ -729,6 +618,8 @@ const App = {
         document.getElementById("docker-enabled").checked = dockerConf.enabled || false;
         document.getElementById("docker-subnet").value = dockerConf.subnet || "";
         document.getElementById("docker-gateway").value = dockerConf.gateway || "";
+        document.getElementById("docker-start-ip").value = dockerConf.start_ip || "";
+        document.getElementById("docker-client-count").value = dockerConf.client_count || 3;
 
         const ifaceSelect = document.getElementById("docker-parent-iface");
         ifaceSelect.innerHTML = '<option value="">-- Select --</option>';
@@ -737,47 +628,18 @@ const App = {
             ifaceSelect.innerHTML += `<option value="${this.esc(iface.name)}" ${sel}>${this.esc(iface.name)}</option>`;
         }
 
-        const tbody = document.querySelector("#docker-containers-table tbody");
-        const containers = dockerConf.containers || [];
-        const statusMap = {};
-        if (data && data.containers) {
-            for (const c of data.containers) statusMap[c.name] = c.status;
+        const statusDiv = document.getElementById("docker-container-status");
+        if (data && data.containers && data.containers.length > 0) {
+            let html = '<div class="small mt-2"><strong>Active Containers:</strong></div><div class="d-flex flex-wrap gap-2 mt-1">';
+            for (const c of data.containers) {
+                const badgeClass = c.status === "running" ? "bg-success" : "bg-warning";
+                html += `<span class="badge ${badgeClass}">${this.esc(c.name)} (${this.esc(c.macvlan_ip)})</span>`;
+            }
+            html += '</div>';
+            statusDiv.innerHTML = html;
+        } else {
+            statusDiv.innerHTML = '';
         }
-
-        let html = "";
-        for (const c of containers) {
-            const st = statusMap[c.name] || "not started";
-            const badgeClass = st === "running" ? "bg-success" : st === "not started" ? "bg-secondary" : "bg-warning";
-            html += `<tr>
-                <td><input type="text" class="form-control form-control-sm" data-field="name" value="${this.esc(c.name || "")}"></td>
-                <td><input type="text" class="form-control form-control-sm" data-field="ip" value="${this.esc(c.ip || "")}"></td>
-                <td><span class="badge ${badgeClass}">${this.esc(st)}</span></td>
-                <td><button class="btn btn-sm btn-outline-danger" onclick="this.closest('tr').remove()">X</button></td>
-            </tr>`;
-        }
-        tbody.innerHTML = html;
-    },
-
-    addDockerContainer() {
-        const tbody = document.querySelector("#docker-containers-table tbody");
-        const tr = document.createElement("tr");
-        tr.innerHTML = `
-            <td><input type="text" class="form-control form-control-sm" data-field="name" value="" placeholder="client profile name"></td>
-            <td><input type="text" class="form-control form-control-sm" data-field="ip" value="" placeholder="10.0.1.101"></td>
-            <td><span class="badge bg-secondary">not started</span></td>
-            <td><button class="btn btn-sm btn-outline-danger" onclick="this.closest('tr').remove()">X</button></td>`;
-        tbody.appendChild(tr);
-    },
-
-    _readDockerContainers() {
-        const rows = document.querySelectorAll("#docker-containers-table tbody tr");
-        const containers = [];
-        rows.forEach(row => {
-            const name = row.querySelector('[data-field="name"]').value.trim();
-            const ip = row.querySelector('[data-field="ip"]').value.trim();
-            if (name && ip) containers.push({name, ip});
-        });
-        return containers;
     },
 
     async saveDockerConfig() {
@@ -786,7 +648,8 @@ const App = {
             parent_interface: document.getElementById("docker-parent-iface").value,
             subnet: document.getElementById("docker-subnet").value.trim(),
             gateway: document.getElementById("docker-gateway").value.trim(),
-            containers: this._readDockerContainers(),
+            start_ip: document.getElementById("docker-start-ip").value.trim(),
+            client_count: parseInt(document.getElementById("docker-client-count").value) || 3,
         };
         await fetch("/api/docker/config", {
             method: "PUT",
@@ -795,69 +658,6 @@ const App = {
         });
         this.config.docker = {...(this.config.docker || {}), ...data};
         this.showToast("Docker config saved");
-    },
-
-    async buildDockerImage() {
-        this.showToast("Building Docker image... this may take a few minutes");
-        try {
-            const res = await fetch("/api/docker/image/build", {method: "POST"});
-            if (res.ok) {
-                this.showToast("Docker image built successfully");
-            } else {
-                const err = await res.json().catch(() => ({}));
-                this.showToast(`Build failed: ${err.detail || res.statusText}`);
-            }
-        } catch (e) {
-            this.showToast(`Build error: ${e.message}`);
-        }
-        this.loadDockerStatus();
-    },
-
-    async createDockerNetwork() {
-        try {
-            const res = await fetch("/api/docker/network/create", {method: "POST"});
-            if (res.ok) {
-                this.showToast("Docker network created");
-            } else {
-                const err = await res.json().catch(() => ({}));
-                this.showToast(`Network error: ${err.detail || res.statusText}`);
-            }
-        } catch (e) {
-            this.showToast(`Network error: ${e.message}`);
-        }
-        this.loadDockerStatus();
-    },
-
-    async startDockerContainers() {
-        this.showToast("Starting Docker containers...");
-        try {
-            const res = await fetch("/api/docker/containers/start", {method: "POST"});
-            if (res.ok) {
-                const data = await res.json();
-                this.showToast(`${(data.containers || []).length} container(s) started`);
-            } else {
-                const err = await res.json().catch(() => ({}));
-                this.showToast(`Start failed: ${err.detail || res.statusText}`);
-            }
-        } catch (e) {
-            this.showToast(`Start error: ${e.message}`);
-        }
-        this.loadDockerStatus();
-    },
-
-    async stopDockerContainers() {
-        try {
-            const res = await fetch("/api/docker/containers/stop", {method: "POST"});
-            if (res.ok) {
-                this.showToast("Docker containers stopped");
-            } else {
-                const err = await res.json().catch(() => ({}));
-                this.showToast(`Stop failed: ${err.detail || res.statusText}`);
-            }
-        } catch (e) {
-            this.showToast(`Stop error: ${e.message}`);
-        }
-        this.loadDockerStatus();
     },
 
     // --- Utilities ---

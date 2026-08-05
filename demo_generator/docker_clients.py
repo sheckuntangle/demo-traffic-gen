@@ -135,25 +135,46 @@ class DockerClientPool:
             self._docker = docker.from_env()
             self._network_mgr = DockerNetworkManager(self._docker, self._config)
 
+    @staticmethod
+    def _generate_ips(start_ip, count):
+        parts = start_ip.split(".")
+        base = ".".join(parts[:3])
+        last = int(parts[3])
+        return [f"{base}.{last + i}" for i in range(count)]
+
     async def start(self):
         if self.is_started:
             return
         self._init_docker()
 
         docker_conf = self._config["docker"]
-        containers_conf = docker_conf.get("containers", [])
-        if not containers_conf:
-            raise ValueError("No Docker containers configured")
+        client_count = docker_conf.get("client_count", 3)
+        start_ip = docker_conf.get("start_ip", "")
+
+        if not start_ip:
+            raise ValueError("Docker start_ip is required")
+        if client_count < 1:
+            raise ValueError("Docker client_count must be >= 1")
+
+        image_name = docker_conf.get("image_name", "demo-generator-worker")
+        if not self.image_exists():
+            import os
+            project_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+            self.build_image(project_dir)
 
         macvlan, mgmt = self._network_mgr.create_networks()
-        image_name = docker_conf.get("image_name", "demo-generator-worker")
 
-        profiles_by_name = {}
-        for p in self._config.get("client_profiles", []):
-            profiles_by_name[p["name"]] = p
+        ips = self._generate_ips(start_ip, client_count)
+        profiles = self._config.get("client_profiles", [])
+
+        containers_conf = []
+        for i in range(client_count):
+            profile_data = profiles[i % len(profiles)] if profiles else {}
+            name = profile_data.get("name", f"client-{i + 1}")
+            containers_conf.append({"name": name, "ip": ips[i], "profile_data": profile_data})
 
         tasks = [
-            self._start_container(c, image_name, macvlan, mgmt, profiles_by_name)
+            self._start_container(c, image_name, macvlan, mgmt)
             for c in containers_conf
         ]
         results = await asyncio.gather(*tasks, return_exceptions=True)
@@ -165,12 +186,12 @@ class DockerClientPool:
 
         logger.info(f"Started {len(self._clients)} Docker client(s)")
 
-    async def _start_container(self, container_conf, image_name, macvlan, mgmt, profiles_by_name):
+    async def _start_container(self, container_conf, image_name, macvlan, mgmt):
         name = container_conf["name"]
         ip = container_conf["ip"]
         container_name = f"{CONTAINER_PREFIX}{name}"
 
-        profile_data = profiles_by_name.get(name, {})
+        profile_data = container_conf.get("profile_data", {})
         viewport = profile_data.get("viewport", {"width": 1920, "height": 1080})
 
         env = {

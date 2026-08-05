@@ -233,49 +233,46 @@ class Engine:
 
     async def _run_categories_on_clients(self, categories):
         clients = self._pool.get_clients()
-        tasks = [
-            self._run_client_round(client, categories)
-            for client in clients
-        ]
-        await asyncio.gather(*tasks)
-
-    async def _run_client_round(self, client, categories):
-        client_name = client.profile.name
-        source_ip = client.profile.source_ip
-
         cats = list(categories)
         random.shuffle(cats)
 
+        tasks = []
         for category in cats:
-            if self._stop_requested:
-                break
+            client = random.choice(clients)
+            tasks.append(self._run_category_on_client(client, category))
+        await asyncio.gather(*tasks)
 
-            self._logger.info(category.display_name,
-                              f"[{client_name}] Running {category.display_name} tests")
+    async def _run_category_on_client(self, client, category):
+        if self._stop_requested:
+            return
 
-            try:
-                results = await client.run_category(category, self._config)
-            except Exception as e:
-                self._logger.log_result(
-                    category.name, "ERROR", "category execution",
-                    "FAIL", str(e)[:80], client_name=client_name,
-                    round_num=self._round_num,
-                )
-                self._stats.record(category.name, False)
-                continue
+        client_name = client.profile.name
+        self._logger.info(category.display_name,
+                          f"[{client_name}] Running {category.display_name} tests")
 
-            for result in results:
-                result.client_name = client_name
-                status = "PASS" if result.success else "FAIL"
-                self._logger.log_result(
-                    category.name, result.test_type, result.target,
-                    status, result.message, client_name=client_name,
-                    round_num=self._round_num,
-                )
-                self._stats.record(category.name, result.success)
-                self._emit("on_test_complete", result=result)
+        try:
+            results = await client.run_category(category, self._config)
+        except Exception as e:
+            self._logger.log_result(
+                category.name, "ERROR", "category execution",
+                "FAIL", str(e)[:80], client_name=client_name,
+                round_num=self._round_num,
+            )
+            self._stats.record(category.name, False)
+            return
 
-            self._logger.separator(category.display_name)
+        for result in results:
+            result.client_name = client_name
+            status = "PASS" if result.success else "FAIL"
+            self._logger.log_result(
+                category.name, result.test_type, result.target,
+                status, result.message, client_name=client_name,
+                round_num=self._round_num,
+            )
+            self._stats.record(category.name, result.success)
+            self._emit("on_test_complete", result=result)
+
+        self._logger.separator(category.display_name)
 
     # --- Single-category run (for "Run Now" from GUI) ---
 
