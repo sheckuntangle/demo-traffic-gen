@@ -32,7 +32,7 @@ class DockerClient:
         url = f"{self.base_url}/run"
         payload = {"category": category.name, "config": config}
         async with aiohttp.ClientSession() as session:
-            async with session.post(url, json=payload, timeout=aiohttp.ClientTimeout(total=120)) as resp:
+            async with session.post(url, json=payload, timeout=aiohttp.ClientTimeout(total=600)) as resp:
                 if resp.status != 200:
                     detail = await resp.text()
                     raise RuntimeError(f"Worker error ({resp.status}): {detail}")

@@ -93,6 +93,8 @@ class RunManager:
     async def _run_engine(self):
         try:
             await self._engine.start(mode=self._mode)
+        except asyncio.CancelledError:
+            pass
         except Exception as e:
             self.logger.info("SYSTEM", f"Engine error: {e}")
         finally:
@@ -102,10 +104,11 @@ class RunManager:
         if self._engine and self._engine.is_running:
             self._engine.request_stop()
             if self._run_task:
+                self._run_task.cancel()
                 try:
-                    await asyncio.wait_for(self._run_task, timeout=30)
-                except asyncio.TimeoutError:
-                    self._run_task.cancel()
+                    await asyncio.wait_for(self._run_task, timeout=10)
+                except (asyncio.TimeoutError, asyncio.CancelledError):
+                    pass
         if self._docker_pool and self._docker_pool.is_started:
             self.logger.info("SYSTEM", "Stopping Docker containers...")
             await self._docker_pool.cleanup()

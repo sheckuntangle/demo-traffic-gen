@@ -2,6 +2,7 @@
 
 import asyncio
 import random
+import traceback
 from enum import Enum
 
 from .categories import get_all_categories
@@ -25,6 +26,7 @@ class Engine:
         self._stop_requested = False
         self._round_num = 0
         self._mode = None
+        self._active_tasks = []
         self._callbacks = {
             "on_round_start": [],
             "on_test_complete": [],
@@ -44,6 +46,8 @@ class Engine:
 
     def request_stop(self):
         self._stop_requested = True
+        for task in self._active_tasks:
+            task.cancel()
 
     @property
     def is_running(self):
@@ -74,6 +78,8 @@ class Engine:
                 await self._run_legitimate_only()
             else:
                 await self._run_triggers_only()
+        except asyncio.CancelledError:
+            self._logger.info("SYSTEM", "Engine stopped.")
         finally:
             self._running = False
 
@@ -89,10 +95,15 @@ class Engine:
     # --- Full mode: concurrent legit + trigger loops ---
 
     async def _run_full_mode(self):
-        await asyncio.gather(
-            self._legitimate_loop(),
-            self._trigger_loop(),
-        )
+        legit_task = asyncio.create_task(self._legitimate_loop())
+        trigger_task = asyncio.create_task(self._trigger_loop())
+        self._active_tasks = [legit_task, trigger_task]
+        try:
+            await asyncio.gather(legit_task, trigger_task)
+        except asyncio.CancelledError:
+            pass
+        finally:
+            self._active_tasks = []
 
     async def _legitimate_loop(self):
         interval = self._config["generator"].get("legitimate_interval_seconds", 45)
@@ -239,8 +250,16 @@ class Engine:
         tasks = []
         for category in cats:
             client = random.choice(clients)
-            tasks.append(self._run_category_on_client(client, category))
-        await asyncio.gather(*tasks)
+            tasks.append(asyncio.create_task(self._run_category_on_client(client, category)))
+        self._active_tasks.extend(tasks)
+        try:
+            await asyncio.gather(*tasks)
+        except asyncio.CancelledError:
+            pass
+        finally:
+            for t in tasks:
+                if t in self._active_tasks:
+                    self._active_tasks.remove(t)
 
     async def _run_category_on_client(self, client, category):
         if self._stop_requested:
@@ -252,12 +271,18 @@ class Engine:
 
         try:
             results = await client.run_category(category, self._config)
+        except asyncio.CancelledError:
+            raise
         except Exception as e:
+            error_msg = f"{type(e).__name__}: {e}"
+            tb = traceback.format_exc()
             self._logger.log_result(
-                category.name, "ERROR", "category execution",
-                "FAIL", str(e)[:80], client_name=client_name,
+                category.name, "ERROR", category.display_name,
+                "FAIL", error_msg, client_name=client_name,
                 round_num=self._round_num,
             )
+            self._logger.info(category.display_name,
+                              f"[{client_name}] {error_msg}\n{tb}")
             self._stats.record(category.name, False)
             return
 
