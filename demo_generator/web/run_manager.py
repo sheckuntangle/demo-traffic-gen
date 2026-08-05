@@ -46,7 +46,7 @@ class RunManager:
         self.ws_clients -= dead
 
     def get_status(self):
-        running = self._engine is not None and self._engine.is_running
+        running = self._run_task is not None and not self._run_task.done()
         elapsed = 0
         if self._start_time and running:
             elapsed = int((datetime.now() - self._start_time).total_seconds())
@@ -102,14 +102,14 @@ class RunManager:
             self.broadcast({"type": "status", "data": self.get_status()})
 
     async def stop(self):
-        if self._engine and self._engine.is_running:
-            self._engine.request_stop()
-            if self._run_task:
-                self._run_task.cancel()
-                try:
-                    await asyncio.wait_for(self._run_task, timeout=10)
-                except (asyncio.TimeoutError, asyncio.CancelledError):
-                    pass
+        if self._run_task and not self._run_task.done():
+            if self._engine:
+                self._engine.request_stop()
+            self._run_task.cancel()
+            try:
+                await asyncio.wait_for(self._run_task, timeout=10)
+            except (asyncio.TimeoutError, asyncio.CancelledError):
+                pass
         if self._docker_pool and self._docker_pool.is_started:
             self.logger.info("SYSTEM", "Stopping Docker containers...")
             await self._docker_pool.cleanup()
