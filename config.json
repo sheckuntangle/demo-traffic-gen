@@ -84,19 +84,19 @@
           "host": "github.com",
           "port": 22,
           "description": "GitHub SSH",
-          "expected": "block+alert"
+          "expected": "block"
         }
       ],
       "web_targets": [
         {
           "url": "https://www.facebook.com",
           "description": "Facebook",
-          "expected": "reject+alert"
+          "expected": "reject"
         },
         {
           "url": "https://mail.google.com",
           "description": "Gmail",
-          "expected": "alert+log"
+          "expected": "alert"
         }
       ]
     },
@@ -105,11 +105,11 @@
       "targets": [
         {
           "domain": "mlb.com",
-          "expected": "block+alert"
+          "expected": "block"
         },
         {
           "domain": "nfl.com",
-          "expected": "reject+alert"
+          "expected": "reject"
         },
         {
           "domain": "nba.com",
@@ -121,7 +121,7 @@
       "enabled": true,
       "countries": {
         "france": {
-          "expected": "block+alert",
+          "expected": "block",
           "targets": [
             {
               "ip": "51.15.0.1",
@@ -138,7 +138,7 @@
           ]
         },
         "switzerland": {
-          "expected": "reject+alert",
+          "expected": "reject",
           "targets": [
             {
               "ip": "82.197.164.1",
@@ -179,12 +179,12 @@
         {
           "url": "https://www.weedmaps.com",
           "category": "marijuana",
-          "expected": "block+alert"
+          "expected": "block"
         },
         {
           "url": "https://www.amazon.com",
           "category": "shopping",
-          "expected": "reject+alert"
+          "expected": "reject"
         },
         {
           "url": "https://www.espn.com",
@@ -199,19 +199,19 @@
         {
           "ip": "208.67.222.222",
           "description": "OpenDNS",
-          "expected": "block+alert"
+          "expected": "block"
         }
       ],
       "domain_targets": [
         {
           "domain": "www.ebay.com",
           "description": "eBay",
-          "expected": "block+alert"
+          "expected": "block"
         },
         {
           "domain": "www.wikipedia.org",
           "description": "Wikipedia",
-          "expected": "block+alert"
+          "expected": "block"
         }
       ]
     },
@@ -221,7 +221,7 @@
         {
           "ip": "9.9.9.9",
           "description": "Quad9",
-          "expected": "block+alert"
+          "expected": "block"
         }
       ]
     },
@@ -232,7 +232,7 @@
         {
           "ip": "198.51.100.1",
           "description": "PLACEHOLDER - verify with BrightCloud",
-          "expected": "block+alert"
+          "expected": "block"
         }
       ]
     },
@@ -243,7 +243,7 @@
         {
           "url": "http://malware.testing.google.test/testing/malware/",
           "description": "PLACEHOLDER - verify with BrightCloud",
-          "expected": "block+alert"
+          "expected": "block"
         }
       ]
     },

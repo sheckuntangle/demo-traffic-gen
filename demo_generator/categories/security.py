@@ -2,7 +2,7 @@
 
 import random
 from . import TestCategory
-from ..primitives import ping, tcp_connect
+from ..primitives import ping, tcp_connect, apply_expected
 
 
 class Security(TestCategory):
@@ -15,17 +15,16 @@ class Security(TestCategory):
 
         for target in cat_config.get("targets", []):
             expected = target.get("expected", "")
-            exp_tag = f"[expected: {expected}] " if expected else ""
 
             result = await ping(target["ip"], target.get("description", ""), source_ip=source_ip)
             result.category = self.name
-            result.message = exp_tag + result.message
+            apply_expected(result, expected)
             results.append(result)
             await _delay()
 
             result = await tcp_connect(target["ip"], 443)
             result.category = self.name
-            result.message = exp_tag + result.message
+            apply_expected(result, expected)
             results.append(result)
             await _delay()
 

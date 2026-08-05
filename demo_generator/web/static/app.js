@@ -445,6 +445,16 @@ const App = {
             <textarea class="form-control form-control-sm font-monospace" id="idps-script" rows="${Math.min(30, Math.max(10, lines + 2))}" style="font-size:12px">${this.esc(script)}</textarea>`;
     },
 
+    _expectedSelect(val) {
+        const opts = ["block", "reject", "alert"];
+        let html = `<select class="form-select form-select-sm" data-field="expected">`;
+        for (const o of opts) {
+            html += `<option value="${o}" ${val === o ? "selected" : ""}>${o}</option>`;
+        }
+        html += `</select>`;
+        return html;
+    },
+
     renderTargetTable(catName, sectionKey, fields, items) {
         const tableId = `table-${catName}-${sectionKey.replace(/\./g, '-')}`;
         let html = `<table class="table table-sm target-table mb-2" id="${tableId}">
@@ -456,7 +466,11 @@ const App = {
             html += "<tr>";
             for (const f of fields) {
                 const val = items[i][f] || "";
-                html += `<td><input type="text" class="form-control form-control-sm" data-field="${f}" value="${this.esc(String(val))}"></td>`;
+                if (f === "expected") {
+                    html += `<td>${this._expectedSelect(val)}</td>`;
+                } else {
+                    html += `<td><input type="text" class="form-control form-control-sm" data-field="${f}" value="${this.esc(String(val))}"></td>`;
+                }
             }
             html += `<td><button class="btn btn-sm btn-outline-danger" onclick="this.closest('tr').remove()">X</button></td></tr>`;
         }
@@ -470,7 +484,11 @@ const App = {
         const tbody = document.querySelector(`#${tableId} tbody`);
         let tr = document.createElement("tr");
         for (const f of fields) {
-            tr.innerHTML += `<td><input type="text" class="form-control form-control-sm" data-field="${f}" value=""></td>`;
+            if (f === "expected") {
+                tr.innerHTML += `<td>${this._expectedSelect("block")}</td>`;
+            } else {
+                tr.innerHTML += `<td><input type="text" class="form-control form-control-sm" data-field="${f}" value=""></td>`;
+            }
         }
         tr.innerHTML += `<td><button class="btn btn-sm btn-outline-danger" onclick="this.closest('tr').remove()">X</button></td>`;
         tbody.appendChild(tr);

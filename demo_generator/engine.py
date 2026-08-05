@@ -328,6 +328,7 @@ class Engine:
         if not cat_cls:
             raise ValueError(f"Unknown category: {category_name}")
 
+        self._stats.reset_category(category_name)
         self._logger.info("SYSTEM", f"Initializing browser pool...")
         await self._pool.start()
         self._logger.info("SYSTEM", f"Running single category: {cat_cls.display_name}")

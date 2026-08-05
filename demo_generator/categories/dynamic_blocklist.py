@@ -2,7 +2,7 @@
 
 import random
 from . import TestCategory
-from ..primitives import ping, tcp_connect, dns_query, web_request
+from ..primitives import ping, tcp_connect, dns_query, web_request, apply_expected
 
 
 class DynamicBlocklist(TestCategory):
@@ -15,27 +15,25 @@ class DynamicBlocklist(TestCategory):
 
         for target in cat_config.get("ip_targets", []):
             expected = target.get("expected", "")
-            exp_tag = f"[expected: {expected}] " if expected else ""
 
             result = await ping(target["ip"], target.get("description", ""), source_ip=source_ip)
             result.category = self.name
-            result.message = exp_tag + result.message
+            apply_expected(result, expected)
             results.append(result)
             await _delay()
 
             result = await tcp_connect(target["ip"], 80)
             result.category = self.name
-            result.message = exp_tag + result.message
+            apply_expected(result, expected)
             results.append(result)
             await _delay()
 
         for target in cat_config.get("domain_targets", []):
             expected = target.get("expected", "")
-            exp_tag = f"[expected: {expected}] " if expected else ""
 
             result = await dns_query(target["domain"])
             result.category = self.name
-            result.message = exp_tag + result.message
+            apply_expected(result, expected)
             results.append(result)
             await _delay()
 
@@ -43,7 +41,7 @@ class DynamicBlocklist(TestCategory):
             await context.clear_cookies()
             result = await web_request(url, context)
             result.category = self.name
-            result.message = exp_tag + result.message
+            apply_expected(result, expected)
             results.append(result)
             await _delay()
 

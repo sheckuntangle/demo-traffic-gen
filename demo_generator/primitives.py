@@ -35,6 +35,13 @@ class TestResult:
         return cls(**d)
 
 
+def apply_expected(result, expected):
+    if expected in ("block", "reject"):
+        result.success = not result.success
+    if expected:
+        result.message = f"[expected: {expected}] {result.message}"
+
+
 async def ping(ip, name="", source_ip=None, timeout=5):
     start = time.monotonic()
     cmd = ["ping", "-c", "1", "-W", "2"]

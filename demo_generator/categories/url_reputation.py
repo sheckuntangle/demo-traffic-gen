@@ -2,7 +2,7 @@
 
 import random
 from . import TestCategory
-from ..primitives import web_request
+from ..primitives import web_request, apply_expected
 
 
 class UrlReputation(TestCategory):
@@ -17,9 +17,7 @@ class UrlReputation(TestCategory):
             await context.clear_cookies()
             result = await web_request(target["url"], context)
             result.category = self.name
-            expected = target.get("expected", "")
-            if expected:
-                result.message = f"[expected: {expected}] {result.message}"
+            apply_expected(result, target.get("expected", ""))
             results.append(result)
             await _delay()
 

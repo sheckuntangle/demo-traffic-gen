@@ -2,7 +2,7 @@
 
 import random
 from . import TestCategory
-from ..primitives import ssh_connect, web_request
+from ..primitives import ssh_connect, web_request, apply_expected
 
 
 class AppControl(TestCategory):
@@ -16,9 +16,7 @@ class AppControl(TestCategory):
         for target in cat_config.get("ssh_targets", []):
             result = await ssh_connect(target["host"], target.get("port", 22))
             result.category = self.name
-            expected = target.get("expected", "")
-            if expected:
-                result.message = f"[expected: {expected}] {result.message}"
+            apply_expected(result, target.get("expected", ""))
             results.append(result)
             await _human_delay()
 
@@ -26,9 +24,7 @@ class AppControl(TestCategory):
             await context.clear_cookies()
             result = await web_request(target["url"], context)
             result.category = self.name
-            expected = target.get("expected", "")
-            if expected:
-                result.message = f"[expected: {expected}] {result.message}"
+            apply_expected(result, target.get("expected", ""))
             results.append(result)
             await _human_delay()
 

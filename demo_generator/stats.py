@@ -34,6 +34,11 @@ class Stats:
             "categories": dict(self._round_stats),
         }
 
+    def reset_category(self, category):
+        with self._lock:
+            self._cumulative[category] = {"pass": 0, "fail": 0}
+            self._round_stats[category] = {"pass": 0, "fail": 0}
+
     def get_round_summary(self):
         with self._lock:
             return self._get_round_summary_unlocked()

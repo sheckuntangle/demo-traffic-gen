@@ -2,7 +2,7 @@
 
 import random
 from . import TestCategory
-from ..primitives import dns_query
+from ..primitives import dns_query, apply_expected
 
 
 class DnsFilter(TestCategory):
@@ -16,9 +16,7 @@ class DnsFilter(TestCategory):
         for target in cat_config.get("targets", []):
             result = await dns_query(target["domain"])
             result.category = self.name
-            expected = target.get("expected", "")
-            if expected:
-                result.message = f"[expected: {expected}] {result.message}"
+            apply_expected(result, target.get("expected", ""))
             results.append(result)
             await _human_delay()
 
