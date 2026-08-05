@@ -84,13 +84,10 @@ class Engine:
             self._running = False
 
     async def _interruptible_sleep(self, seconds):
-        try:
-            remaining = seconds
-            while remaining > 0 and not self._stop_requested:
-                await asyncio.sleep(min(1, remaining))
-                remaining -= 1
-        except asyncio.CancelledError:
-            pass
+        remaining = seconds
+        while remaining > 0 and not self._stop_requested:
+            await asyncio.sleep(min(1, remaining))
+            remaining -= 1
 
     # --- Full mode: concurrent legit + trigger loops ---
 
@@ -101,7 +98,9 @@ class Engine:
         try:
             await asyncio.gather(legit_task, trigger_task)
         except asyncio.CancelledError:
-            pass
+            legit_task.cancel()
+            trigger_task.cancel()
+            raise
         finally:
             self._active_tasks = []
 
@@ -255,7 +254,9 @@ class Engine:
         try:
             await asyncio.gather(*tasks)
         except asyncio.CancelledError:
-            pass
+            for t in tasks:
+                t.cancel()
+            raise
         finally:
             for t in tasks:
                 if t in self._active_tasks:

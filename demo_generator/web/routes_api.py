@@ -33,8 +33,8 @@ async def start(req: StartRequest, request: Request):
 @router.post("/stop")
 async def stop(request: Request):
     manager = request.app.state.manager
-    await manager.stop()
-    return {"status": "stopped"}
+    asyncio.create_task(manager.stop())
+    return {"status": "stopping"}
 
 
 @router.post("/run/{category_name}")
