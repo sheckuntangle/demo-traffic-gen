@@ -85,6 +85,20 @@ class DockerNetworkManager:
             raise ValueError("parent_interface, subnet, and gateway are required")
 
         macvlan = self.get_macvlan_network()
+        if macvlan:
+            existing_subnet = ""
+            try:
+                macvlan.reload()
+                pools = macvlan.attrs.get("IPAM", {}).get("Config", [])
+                if pools:
+                    existing_subnet = pools[0].get("Subnet", "")
+            except Exception:
+                pass
+            if existing_subnet != subnet:
+                logger.info(f"Macvlan subnet changed ({existing_subnet} -> {subnet}), recreating network")
+                macvlan.remove()
+                macvlan = None
+
         if not macvlan:
             import docker as docker_mod
             ipam_pool = docker_mod.types.IPAMPool(subnet=subnet, gateway=gateway)
