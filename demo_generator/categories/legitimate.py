@@ -19,13 +19,16 @@ class Legitimate(TestCategory):
             dns_range = gen.get("dns_sample_range", [15, 25])
             sample_size = min(random.randint(dns_range[0], dns_range[1]), len(dns_domains))
             sample = random.sample(dns_domains, sample_size)
-            results.append(TestResult(
+            phase = TestResult(
                 test_type="INFO", target=f"DNS queries ({len(sample)} domains)",
                 success=True, message="Starting DNS phase", category=self.name,
-            ))
+            )
+            self.emit_result(phase)
+            results.append(phase)
             for domain in sample:
                 result = await dns_query(domain)
                 result.category = self.name
+                self.emit_result(result)
                 results.append(result)
                 await _dns_delay()
 
@@ -34,13 +37,16 @@ class Legitimate(TestCategory):
             web_range = gen.get("web_sample_range", [10, 20])
             sample_size = min(random.randint(web_range[0], web_range[1]), len(web_urls))
             sample = random.sample(web_urls, sample_size)
-            results.append(TestResult(
+            phase = TestResult(
                 test_type="INFO", target=f"Web requests ({len(sample)} URLs)",
                 success=True, message="Starting web phase", category=self.name,
-            ))
+            )
+            self.emit_result(phase)
+            results.append(phase)
             for url in sample:
                 result = await web_request(url, context)
                 result.category = self.name
+                self.emit_result(result)
                 results.append(result)
                 await _web_delay()
 
@@ -49,13 +55,16 @@ class Legitimate(TestCategory):
             ping_range = gen.get("ping_sample_range", [2, 4])
             sample_size = min(random.randint(ping_range[0], ping_range[1]), len(ping_targets))
             sample = random.sample(ping_targets, sample_size)
-            results.append(TestResult(
+            phase = TestResult(
                 test_type="INFO", target=f"Ping targets ({len(sample)} hosts)",
                 success=True, message="Starting ping phase", category=self.name,
-            ))
+            )
+            self.emit_result(phase)
+            results.append(phase)
             for target in sample:
                 result = await ping(target["ip"], target.get("name", ""), source_ip=source_ip)
                 result.category = self.name
+                self.emit_result(result)
                 results.append(result)
                 await _ping_delay()
 

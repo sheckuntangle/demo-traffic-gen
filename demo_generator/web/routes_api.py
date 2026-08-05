@@ -50,6 +50,13 @@ async def run_single(category_name: str, request: Request):
     return {"status": "completed", "category": category_name}
 
 
+@router.post("/run/stop")
+async def stop_single(request: Request):
+    manager = request.app.state.manager
+    await manager.stop_single()
+    return {"status": "stopped"}
+
+
 @router.get("/status")
 async def status(request: Request):
     manager = request.app.state.manager

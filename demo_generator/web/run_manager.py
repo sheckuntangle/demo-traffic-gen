@@ -26,6 +26,7 @@ class RunManager:
         self._docker_pool = None
         self._engine = None
         self._run_task = None
+        self._single_run_task = None
         self._mode = None
         self._start_time = None
         self.ws_clients = set()
@@ -117,10 +118,26 @@ class RunManager:
         try:
             pool = await self._get_active_pool()
             engine = Engine(self.config, self.logger, self.stats, pool=pool)
-            await engine.run_single_category(category_name)
+            self._single_run_task = asyncio.create_task(
+                engine.run_single_category(category_name)
+            )
+            await self._single_run_task
+        except asyncio.CancelledError:
+            self.logger.info("SYSTEM", f"Single run cancelled: {category_name}")
         except Exception as e:
             self.logger.info("ERROR", f"Single run error ({category_name}): {type(e).__name__}: {e}")
             raise
+        finally:
+            self._single_run_task = None
+
+    async def stop_single(self):
+        if self._single_run_task and not self._single_run_task.done():
+            self._single_run_task.cancel()
+            try:
+                await asyncio.wait_for(self._single_run_task, timeout=5)
+            except (asyncio.TimeoutError, asyncio.CancelledError):
+                pass
+            self._single_run_task = None
 
     def update_config(self, section, key, data):
         if section == "generator":

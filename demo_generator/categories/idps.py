@@ -87,21 +87,29 @@ class IDPS(TestCategory):
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.STDOUT,
             )
-            stdout, _ = await asyncio.wait_for(proc.communicate(), timeout=120)
-            elapsed = (time.monotonic() - start) * 1000
-            output = stdout.decode(errors="replace")
+            results = await self._stream_output(proc, start)
 
-            return self._parse_results(output, elapsed, proc.returncode)
-        except asyncio.TimeoutError:
-            elapsed = (time.monotonic() - start) * 1000
-            return [TestResult(
-                test_type="IDPS", target="script", success=False,
-                message="Script timed out", duration_ms=elapsed, category=self.name,
-            )]
+            try:
+                await asyncio.wait_for(proc.wait(), timeout=10)
+            except asyncio.TimeoutError:
+                proc.kill()
+
+            if not results:
+                elapsed = (time.monotonic() - start) * 1000
+                results.append(TestResult(
+                    test_type="IDPS", target="script", success=proc.returncode == 0,
+                    message=f"Exit code {proc.returncode}", duration_ms=elapsed,
+                    category=self.name,
+                ))
+
+            return results
+        except asyncio.CancelledError:
+            proc.kill()
+            raise
         except Exception as e:
             return [TestResult(
                 test_type="IDPS", target="script", success=False,
-                message=str(e)[:80], category=self.name,
+                message=f"{type(e).__name__}: {e}", category=self.name,
             )]
         finally:
             try:
@@ -109,33 +117,59 @@ class IDPS(TestCategory):
             except OSError:
                 pass
 
-    def _parse_results(self, output, total_elapsed, returncode):
+    async def _stream_output(self, proc, start):
         results = []
         current_test = None
 
-        for line in output.splitlines():
-            stripped = line.strip()
+        while True:
+            try:
+                line = await asyncio.wait_for(proc.stdout.readline(), timeout=30)
+            except asyncio.TimeoutError:
+                r = TestResult(
+                    test_type="IDPS", target=current_test or "script",
+                    success=False, message="Timed out waiting for output",
+                    duration_ms=(time.monotonic() - start) * 1000,
+                    category=self.name,
+                )
+                self.emit_result(r)
+                results.append(r)
+                proc.kill()
+                break
+
+            if not line:
+                break
+
+            stripped = line.decode(errors="replace").strip()
+            if not stripped:
+                continue
+
+            elapsed = (time.monotonic() - start) * 1000
+
             if stripped.startswith("Test "):
                 current_test = stripped
-            elif stripped.startswith("-> ") and current_test:
-                results.append(TestResult(
-                    test_type="IDPS",
-                    target=current_test,
-                    success=True,
-                    message=stripped[3:],
-                    duration_ms=total_elapsed / max(1, len(results) + 1),
+                r = TestResult(
+                    test_type="IDPS", target=stripped, success=True,
+                    message="Running...", duration_ms=elapsed,
                     category=self.name,
-                ))
+                )
+                self.emit_result(r)
+                results.append(r)
+            elif stripped.startswith("-> ") and current_test:
+                r = TestResult(
+                    test_type="IDPS", target=current_test, success=True,
+                    message=stripped[3:], duration_ms=elapsed,
+                    category=self.name,
+                )
+                self.emit_result(r)
+                results.append(r)
                 current_test = None
-
-        if not results:
-            results.append(TestResult(
-                test_type="IDPS",
-                target="script",
-                success=returncode == 0,
-                message=f"Exit code {returncode}" + (f" | {output[:100]}" if output else ""),
-                duration_ms=total_elapsed,
-                category=self.name,
-            ))
+            elif stripped.startswith("RUNNING") or stripped == "Testing complete.":
+                r = TestResult(
+                    test_type="IDPS", target=stripped, success=True,
+                    message="", duration_ms=elapsed,
+                    category=self.name,
+                )
+                self.emit_result(r)
+                results.append(r)
 
         return results

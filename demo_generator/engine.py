@@ -261,6 +261,20 @@ class Engine:
                 if t in self._active_tasks:
                     self._active_tasks.remove(t)
 
+    def _make_result_callback(self, category, client_name):
+        def on_result(result):
+            result.client_name = client_name
+            result.category = category.name
+            status = "PASS" if result.success else "FAIL"
+            self._logger.log_result(
+                category.name, result.test_type, result.target,
+                status, result.message, client_name=client_name,
+                round_num=self._round_num,
+            )
+            self._stats.record(category.name, result.success)
+            self._emit("on_test_complete", result=result)
+        return on_result
+
     async def _run_category_on_client(self, client, category):
         if self._stop_requested:
             return
@@ -268,6 +282,8 @@ class Engine:
         client_name = client.profile.name
         self._logger.info(category.display_name,
                           f"[{client_name}] Running {category.display_name} tests")
+
+        category._on_result = self._make_result_callback(category, client_name)
 
         try:
             results = await client.run_category(category, self._config)
@@ -285,8 +301,12 @@ class Engine:
                               f"[{client_name}] {error_msg}\n{tb}")
             self._stats.record(category.name, False)
             return
+        finally:
+            category._on_result = None
 
         for result in results:
+            if result.client_name:
+                continue
             result.client_name = client_name
             status = "PASS" if result.success else "FAIL"
             self._logger.log_result(

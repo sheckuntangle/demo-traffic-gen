@@ -105,8 +105,10 @@ const App = {
     },
 
     async runCategory(name) {
-        const btn = document.querySelector(`[data-run="${name}"]`);
-        if (btn) { btn.disabled = true; btn.textContent = "Running..."; }
+        const runBtn = document.querySelector(`[data-run="${name}"]`);
+        const stopBtn = document.querySelector(`[data-stop="${name}"]`);
+        if (runBtn) { runBtn.style.display = "none"; }
+        if (stopBtn) { stopBtn.style.display = "inline-block"; }
         try {
             const res = await fetch(`/api/run/${name}`, {method: "POST"});
             if (!res.ok) {
@@ -117,8 +119,17 @@ const App = {
         } catch (e) {
             this.showToast(`Network error: ${e.message}`);
         } finally {
-            if (btn) { btn.disabled = false; btn.textContent = "Run Now"; }
+            if (runBtn) { runBtn.style.display = "inline-block"; }
+            if (stopBtn) { stopBtn.style.display = "none"; }
         }
+    },
+
+    async stopCategory(name) {
+        await fetch("/api/run/stop", {method: "POST"});
+        const runBtn = document.querySelector(`[data-run="${name}"]`);
+        const stopBtn = document.querySelector(`[data-stop="${name}"]`);
+        if (runBtn) { runBtn.style.display = "inline-block"; }
+        if (stopBtn) { stopBtn.style.display = "none"; }
     },
 
     // --- Status ---
@@ -236,7 +247,8 @@ const App = {
             const s = cats[name] || {pass: 0, fail: 0};
             const total = s.pass + s.fail;
             const display = CATEGORY_DISPLAY[name] || name;
-            const runBtn = `<button class="btn btn-sm btn-outline-light mt-2" data-run="${name}" onclick="App.runCategory('${name}')">Run Now</button>`;
+            const runBtn = `<button class="btn btn-sm btn-outline-light mt-2" data-run="${name}" onclick="App.runCategory('${name}')">Run Now</button>`
+                + `<button class="btn btn-sm btn-danger mt-2" data-stop="${name}" onclick="App.stopCategory('${name}')" style="display:none">Stop</button>`;
 
             html += `<div class="col"><div class="card stat-card h-100">
                 <div class="card-body text-center p-2">
