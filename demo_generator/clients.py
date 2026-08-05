@@ -93,7 +93,11 @@ class ClientPool:
     def _build_profiles(self):
         profiles = []
         configured = self._config.get("client_profiles", [])
-        client_count = self._config["generator"]["client_count"]
+        docker_conf = self._config.get("docker", {})
+        if docker_conf.get("enabled"):
+            client_count = docker_conf.get("client_count", 3)
+        else:
+            client_count = max(1, len(configured)) if configured else 1
 
         for p in configured[:client_count]:
             profiles.append(ClientProfile(

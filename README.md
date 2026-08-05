@@ -95,7 +95,6 @@ IP aliasing adds secondary addresses to the host interface. This only affects `p
   --config PATH       Config file path (default: config.json)
   --rounds N          Number of rounds, 0=unlimited (default: from config)
   --interval SECS     Seconds between rounds (default: from config)
-  --clients N         Number of simulated clients (default: from config)
   --categories LIST   Comma-separated category names to enable
   --log-dir PATH      Log output directory (default: from config)
 ```
@@ -107,7 +106,7 @@ IP aliasing adds secondary addresses to the host interface. This only affects `p
 ./run.sh --port 9090
 
 # Run headless with 5 rounds
-./run.sh --headless --rounds 5 --clients 2 --interval 60
+./run.sh --headless --rounds 5 --interval 60
 
 # Run only DNS filter and geo-IP categories
 ./run.sh --headless --categories dns_filter,geo_ip

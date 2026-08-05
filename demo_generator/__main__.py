@@ -22,7 +22,6 @@ def parse_args():
     parser.add_argument("--port", type=int, default=8080, help="Web GUI port (default: 8080)")
     parser.add_argument("--rounds", type=int, default=None, help="Number of rounds (0=unlimited, default: from config)")
     parser.add_argument("--interval", type=int, default=None, help="Seconds between rounds (default: from config)")
-    parser.add_argument("--clients", type=int, default=None, help="Number of simulated clients (default: from config)")
     parser.add_argument("--categories", type=str, default=None, help="Comma-separated category names to enable")
     parser.add_argument("--log-dir", default=None, help="Log output directory (default: from config)")
     return parser.parse_args()
@@ -33,8 +32,6 @@ def apply_overrides(config, args):
         config["generator"]["max_rounds"] = args.rounds
     if args.interval is not None:
         config["generator"]["round_interval_seconds"] = args.interval
-    if args.clients is not None:
-        config["generator"]["client_count"] = args.clients
     if args.categories is not None:
         enabled = [c.strip() for c in args.categories.split(",")]
         for cat_name, cat_config in config["categories"].items():

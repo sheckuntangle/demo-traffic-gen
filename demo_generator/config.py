@@ -20,7 +20,6 @@ GENERATOR_DEFAULTS = {
     "round_interval_seconds": 300,
     "legitimate_interval_seconds": 45,
     "max_rounds": 0,
-    "client_count": 3,
     "dns_sample_range": [15, 25],
     "web_sample_range": [10, 20],
     "ping_sample_range": [2, 4],

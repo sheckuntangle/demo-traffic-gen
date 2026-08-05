@@ -283,7 +283,6 @@ const App = {
             {key: "round_interval_seconds", label: "Trigger Round Interval (seconds)", type: "number"},
             {key: "legitimate_interval_seconds", label: "Legitimate Traffic Interval (seconds)", type: "number"},
             {key: "max_rounds", label: "Max Rounds (0 = unlimited)", type: "number"},
-            {key: "client_count", label: "Client Count", type: "number"},
             {key: "interface", label: "Network Interface", type: "interface"},
             {key: "dns_sample_range", label: "DNS Queries per Round (min-max)", type: "range"},
             {key: "web_sample_range", label: "Web Requests per Round (min-max)", type: "range"},
