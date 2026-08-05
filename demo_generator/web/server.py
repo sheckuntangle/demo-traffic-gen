@@ -43,7 +43,8 @@ def create_app(config, config_path):
 
     @app.get("/")
     async def index():
-        return FileResponse(os.path.join(STATIC_DIR, "index.html"))
+        index_path = os.path.join(STATIC_DIR, "index.html")
+        return FileResponse(index_path, headers={"Cache-Control": "no-cache"})
 
     return app
 
@@ -58,5 +59,7 @@ def run_web(config, config_path, host="0.0.0.0", port=8080):
     )
 
     app = create_app(config, config_path)
-    print(f"\n  Traffic Generator Web GUI: http://{host}:{port}\n")
+    print(f"\n  Traffic Generator Web GUI: http://{host}:{port}")
+    print(f"  Serving static files from: {os.path.abspath(STATIC_DIR)}")
+    print(f"  Config file: {os.path.abspath(config_path)}\n")
     uvicorn.run(app, host=host, port=port, log_level="info")

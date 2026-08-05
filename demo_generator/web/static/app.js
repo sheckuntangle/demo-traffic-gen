@@ -465,7 +465,7 @@ const App = {
     renderClientProfiles() {
         const profiles = this.config.client_profiles || [];
         const container = document.getElementById("client-profiles-config");
-        let html = container.querySelector("p").outerHTML;
+        let html = `<p class="text-muted small">Each client simulates a different user with a unique browser fingerprint. Set <code>source_ip</code> to an IP alias added above for real source IP diversity in firewall reports.</p>`;
 
         html += `<table class="table table-sm target-table" id="table-client-profiles">
             <thead><tr>
