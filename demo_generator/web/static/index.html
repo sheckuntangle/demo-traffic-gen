@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Firewall Demo Traffic Generator</title>
     <link href="/static/bootstrap.min.css" rel="stylesheet">
-    <link href="/static/style.css?v=3" rel="stylesheet">
+    <link href="/static/style.css?v=4" rel="stylesheet">
 </head>
 <body>
 
@@ -105,6 +105,50 @@
                 </div>
             </div>
 
+            <!-- Docker Clients -->
+            <div class="card mb-3">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <strong>Docker Clients (macvlan)</strong>
+                    <span id="docker-status-badge" class="badge bg-secondary">Checking...</span>
+                </div>
+                <div class="card-body">
+                    <p class="text-muted small">Run each client in its own Docker container on a macvlan network. Each container gets a unique IP on the firewall's subnet, so all traffic types appear from different source IPs in reports.</p>
+                    <div class="form-check form-switch mb-3">
+                        <input class="form-check-input" type="checkbox" id="docker-enabled">
+                        <label class="form-check-label" for="docker-enabled">Enable Docker client mode</label>
+                    </div>
+                    <div id="docker-config-section">
+                        <div class="row g-3 mb-3">
+                            <div class="col-md-4">
+                                <label class="form-label small">Parent Interface</label>
+                                <select class="form-select form-select-sm" id="docker-parent-iface"></select>
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label small">Subnet (CIDR)</label>
+                                <input type="text" class="form-control form-control-sm" id="docker-subnet" placeholder="10.0.1.0/24">
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label small">Gateway</label>
+                                <input type="text" class="form-control form-control-sm" id="docker-gateway" placeholder="10.0.1.1">
+                            </div>
+                        </div>
+                        <h6>Containers</h6>
+                        <table class="table table-sm target-table" id="docker-containers-table">
+                            <thead><tr><th>Client Profile Name</th><th>IP Address</th><th>Status</th><th></th></tr></thead>
+                            <tbody></tbody>
+                        </table>
+                        <button class="btn btn-sm btn-outline-light mb-3" onclick="App.addDockerContainer()">+ Add Container</button>
+                        <div class="d-flex gap-2 flex-wrap">
+                            <button class="btn btn-primary btn-sm" onclick="App.saveDockerConfig()">Save Config</button>
+                            <button class="btn btn-sm btn-outline-light" onclick="App.buildDockerImage()">Build Image</button>
+                            <button class="btn btn-sm btn-outline-light" onclick="App.createDockerNetwork()">Create Network</button>
+                            <button class="btn btn-sm btn-success" onclick="App.startDockerContainers()">Start All</button>
+                            <button class="btn btn-sm btn-danger" onclick="App.stopDockerContainers()">Stop All</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
             <!-- Client Profiles -->
             <div class="card mb-3">
                 <div class="card-header"><strong>Client Profiles</strong></div>
@@ -126,6 +170,6 @@
 </div>
 
 <script src="/static/bootstrap.bundle.min.js"></script>
-<script src="/static/app.js?v=3"></script>
+<script src="/static/app.js?v=4"></script>
 </body>
 </html>

@@ -269,6 +269,7 @@ const App = {
         try { this.renderClientProfiles(); console.log("[loadConfig] profiles OK"); } catch (e) { console.error("[loadConfig] renderClientProfiles error:", e); }
         try { this.renderCategoryConfigs(); console.log("[loadConfig] categories OK"); } catch (e) { console.error("[loadConfig] renderCategoryConfigs error:", e); }
         try { this.renderLegitConfig(); console.log("[loadConfig] legit OK"); } catch (e) { console.error("[loadConfig] renderLegitConfig error:", e); }
+        try { await this.loadDockerStatus(); console.log("[loadConfig] docker OK"); } catch (e) { console.error("[loadConfig] docker error:", e); }
         console.log("[loadConfig] done");
     },
 
@@ -691,6 +692,172 @@ const App = {
         });
         this.config.legitimate_traffic = data;
         this.showToast("Legitimate traffic config saved");
+    },
+
+    // --- Docker ---
+
+    async loadDockerStatus() {
+        try {
+            const res = await fetch("/api/docker/status");
+            const data = await res.json();
+            this.dockerStatus = data;
+
+            const badge = document.getElementById("docker-status-badge");
+            if (!data.docker_available) {
+                badge.textContent = "Docker Not Installed";
+                badge.className = "badge bg-secondary";
+            } else if (data.containers && data.containers.length > 0) {
+                const running = data.containers.filter(c => c.status === "running").length;
+                badge.textContent = `${running}/${data.containers.length} Running`;
+                badge.className = "badge bg-success";
+            } else if (data.enabled) {
+                badge.textContent = "Enabled";
+                badge.className = "badge bg-info";
+            } else {
+                badge.textContent = "Disabled";
+                badge.className = "badge bg-secondary";
+            }
+
+            this.renderDockerConfig(data);
+        } catch (e) {
+            console.error("[loadDockerStatus]", e);
+        }
+    },
+
+    renderDockerConfig(data) {
+        const dockerConf = this.config.docker || {};
+        document.getElementById("docker-enabled").checked = dockerConf.enabled || false;
+        document.getElementById("docker-subnet").value = dockerConf.subnet || "";
+        document.getElementById("docker-gateway").value = dockerConf.gateway || "";
+
+        const ifaceSelect = document.getElementById("docker-parent-iface");
+        ifaceSelect.innerHTML = '<option value="">-- Select --</option>';
+        for (const iface of (this.interfaces || [])) {
+            const sel = (dockerConf.parent_interface === iface.name) ? "selected" : "";
+            ifaceSelect.innerHTML += `<option value="${this.esc(iface.name)}" ${sel}>${this.esc(iface.name)}</option>`;
+        }
+
+        const tbody = document.querySelector("#docker-containers-table tbody");
+        const containers = dockerConf.containers || [];
+        const statusMap = {};
+        if (data && data.containers) {
+            for (const c of data.containers) statusMap[c.name] = c.status;
+        }
+
+        let html = "";
+        for (const c of containers) {
+            const st = statusMap[c.name] || "not started";
+            const badgeClass = st === "running" ? "bg-success" : st === "not started" ? "bg-secondary" : "bg-warning";
+            html += `<tr>
+                <td><input type="text" class="form-control form-control-sm" data-field="name" value="${this.esc(c.name || "")}"></td>
+                <td><input type="text" class="form-control form-control-sm" data-field="ip" value="${this.esc(c.ip || "")}"></td>
+                <td><span class="badge ${badgeClass}">${this.esc(st)}</span></td>
+                <td><button class="btn btn-sm btn-outline-danger" onclick="this.closest('tr').remove()">X</button></td>
+            </tr>`;
+        }
+        tbody.innerHTML = html;
+    },
+
+    addDockerContainer() {
+        const tbody = document.querySelector("#docker-containers-table tbody");
+        const tr = document.createElement("tr");
+        tr.innerHTML = `
+            <td><input type="text" class="form-control form-control-sm" data-field="name" value="" placeholder="client profile name"></td>
+            <td><input type="text" class="form-control form-control-sm" data-field="ip" value="" placeholder="10.0.1.101"></td>
+            <td><span class="badge bg-secondary">not started</span></td>
+            <td><button class="btn btn-sm btn-outline-danger" onclick="this.closest('tr').remove()">X</button></td>`;
+        tbody.appendChild(tr);
+    },
+
+    _readDockerContainers() {
+        const rows = document.querySelectorAll("#docker-containers-table tbody tr");
+        const containers = [];
+        rows.forEach(row => {
+            const name = row.querySelector('[data-field="name"]').value.trim();
+            const ip = row.querySelector('[data-field="ip"]').value.trim();
+            if (name && ip) containers.push({name, ip});
+        });
+        return containers;
+    },
+
+    async saveDockerConfig() {
+        const data = {
+            enabled: document.getElementById("docker-enabled").checked,
+            parent_interface: document.getElementById("docker-parent-iface").value,
+            subnet: document.getElementById("docker-subnet").value.trim(),
+            gateway: document.getElementById("docker-gateway").value.trim(),
+            containers: this._readDockerContainers(),
+        };
+        await fetch("/api/docker/config", {
+            method: "PUT",
+            headers: {"Content-Type": "application/json"},
+            body: JSON.stringify(data),
+        });
+        this.config.docker = {...(this.config.docker || {}), ...data};
+        this.showToast("Docker config saved");
+    },
+
+    async buildDockerImage() {
+        this.showToast("Building Docker image... this may take a few minutes");
+        try {
+            const res = await fetch("/api/docker/image/build", {method: "POST"});
+            if (res.ok) {
+                this.showToast("Docker image built successfully");
+            } else {
+                const err = await res.json().catch(() => ({}));
+                this.showToast(`Build failed: ${err.detail || res.statusText}`);
+            }
+        } catch (e) {
+            this.showToast(`Build error: ${e.message}`);
+        }
+        this.loadDockerStatus();
+    },
+
+    async createDockerNetwork() {
+        try {
+            const res = await fetch("/api/docker/network/create", {method: "POST"});
+            if (res.ok) {
+                this.showToast("Docker network created");
+            } else {
+                const err = await res.json().catch(() => ({}));
+                this.showToast(`Network error: ${err.detail || res.statusText}`);
+            }
+        } catch (e) {
+            this.showToast(`Network error: ${e.message}`);
+        }
+        this.loadDockerStatus();
+    },
+
+    async startDockerContainers() {
+        this.showToast("Starting Docker containers...");
+        try {
+            const res = await fetch("/api/docker/containers/start", {method: "POST"});
+            if (res.ok) {
+                const data = await res.json();
+                this.showToast(`${(data.containers || []).length} container(s) started`);
+            } else {
+                const err = await res.json().catch(() => ({}));
+                this.showToast(`Start failed: ${err.detail || res.statusText}`);
+            }
+        } catch (e) {
+            this.showToast(`Start error: ${e.message}`);
+        }
+        this.loadDockerStatus();
+    },
+
+    async stopDockerContainers() {
+        try {
+            const res = await fetch("/api/docker/containers/stop", {method: "POST"});
+            if (res.ok) {
+                this.showToast("Docker containers stopped");
+            } else {
+                const err = await res.json().catch(() => ({}));
+                this.showToast(`Stop failed: ${err.detail || res.statusText}`);
+            }
+        } catch (e) {
+            this.showToast(`Stop error: ${e.message}`);
+        }
+        this.loadDockerStatus();
     },
 
     // --- Utilities ---

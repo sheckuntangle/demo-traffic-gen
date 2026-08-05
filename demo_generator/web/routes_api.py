@@ -3,7 +3,9 @@
 import asyncio
 import json
 import logging
+import os
 import re
+import shutil
 
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel
@@ -12,6 +14,8 @@ from typing import Optional
 logger = logging.getLogger("demo_generator.web.api")
 
 router = APIRouter()
+
+docker_router = APIRouter(prefix="/docker")
 
 
 class StartRequest(BaseModel):
@@ -204,3 +208,127 @@ async def remove_ip(req: RemoveIpRequest):
     if rc != 0:
         raise HTTPException(500, f"Failed to remove IP: {stderr.strip()}")
     return {"status": "removed", "ip": req.ip, "interface": req.interface}
+
+
+# --- Docker Client Management ---
+
+
+@docker_router.get("/status")
+async def docker_status(request: Request):
+    manager = request.app.state.manager
+    docker_conf = manager.config.get("docker", {})
+    result = {
+        "docker_available": shutil.which("docker") is not None,
+        "enabled": docker_conf.get("enabled", False),
+        "image_exists": False,
+        "image_name": docker_conf.get("image_name", "demo-generator-worker"),
+        "network_exists": False,
+        "containers": [],
+    }
+    try:
+        pool = manager.get_docker_pool()
+        result["image_exists"] = pool.image_exists()
+        net_mgr = pool._network_mgr
+        if net_mgr:
+            result["network_exists"] = net_mgr.get_macvlan_network() is not None
+        if pool.is_started:
+            result["containers"] = pool.get_status()
+    except Exception as e:
+        logger.debug(f"Docker status check: {e}")
+    return result
+
+
+@docker_router.put("/config")
+async def update_docker_config(request: Request):
+    manager = request.app.state.manager
+    data = await request.json()
+    docker_conf = manager.config.setdefault("docker", {})
+    for key in ("enabled", "parent_interface", "subnet", "gateway", "containers",
+                "image_name", "network_name", "worker_port"):
+        if key in data:
+            docker_conf[key] = data[key]
+    manager._save_config()
+    return {"status": "saved"}
+
+
+@docker_router.get("/image/status")
+async def docker_image_status(request: Request):
+    manager = request.app.state.manager
+    docker_conf = manager.config.get("docker", {})
+    image_name = docker_conf.get("image_name", "demo-generator-worker")
+    try:
+        pool = manager.get_docker_pool()
+        pool._init_docker()
+        image = pool._docker.images.get(image_name)
+        return {
+            "exists": True,
+            "id": image.short_id,
+            "tags": image.tags,
+            "created": image.attrs.get("Created", ""),
+        }
+    except Exception:
+        return {"exists": False}
+
+
+@docker_router.post("/image/build")
+async def docker_image_build(request: Request):
+    manager = request.app.state.manager
+    try:
+        pool = manager.get_docker_pool()
+        project_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+        await asyncio.to_thread(pool.build_image, project_dir)
+        return {"status": "built"}
+    except Exception as e:
+        logger.error(f"Docker image build failed: {e}")
+        raise HTTPException(500, f"Build failed: {e}")
+
+
+@docker_router.post("/network/create")
+async def docker_network_create(request: Request):
+    manager = request.app.state.manager
+    try:
+        pool = manager.get_docker_pool()
+        pool._init_docker()
+        pool._network_mgr.create_networks()
+        return {"status": "created"}
+    except Exception as e:
+        logger.error(f"Docker network creation failed: {e}")
+        raise HTTPException(500, str(e))
+
+
+@docker_router.post("/network/remove")
+async def docker_network_remove(request: Request):
+    manager = request.app.state.manager
+    try:
+        pool = manager.get_docker_pool()
+        pool._init_docker()
+        pool._network_mgr.remove_networks()
+        return {"status": "removed"}
+    except Exception as e:
+        logger.error(f"Docker network removal failed: {e}")
+        raise HTTPException(500, str(e))
+
+
+@docker_router.post("/containers/start")
+async def docker_containers_start(request: Request):
+    manager = request.app.state.manager
+    try:
+        pool = manager.get_docker_pool()
+        await pool.start()
+        manager._docker_pool = pool
+        return {"status": "started", "containers": pool.get_status()}
+    except Exception as e:
+        logger.error(f"Docker containers start failed: {e}")
+        raise HTTPException(500, str(e))
+
+
+@docker_router.post("/containers/stop")
+async def docker_containers_stop(request: Request):
+    manager = request.app.state.manager
+    try:
+        pool = manager.get_docker_pool()
+        await pool.cleanup()
+        return {"status": "stopped"}
+    except Exception as e:
+        logger.error(f"Docker containers stop failed: {e}")
+        raise HTTPException(500, str(e))

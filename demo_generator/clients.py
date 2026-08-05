@@ -77,6 +77,9 @@ class ClientContext:
     profile: ClientProfile
     browser_context: object = None
 
+    async def run_category(self, category, config):
+        return await category.run(self.browser_context, config, source_ip=self.profile.source_ip)
+
 
 class ClientPool:
     def __init__(self, config):

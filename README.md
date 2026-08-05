@@ -2,6 +2,32 @@
 
 Multi-client, long-running traffic generator for populating firewall reporting dashboards. Generates realistic traffic across 8 firewall service categories with a web-based GUI for control and monitoring.
 
+## Topology
+
+```
+                ┌─────────────────┐
+                │    Firewall      │
+                │  (NGFW / UTM)    │
+                └────────┬────────┘
+                         │
+                DHCP subnet (e.g. 10.0.1.0/24)
+                         │
+                ┌────────┴────────┐
+                │  Ubuntu Server   │
+                │  (traffic gen)   │
+                │                  │
+                │  Local mode:     │
+                │    single IP     │
+                │                  │
+                │  Docker mode:    │
+                │    container-1   │  10.0.1.101
+                │    container-2   │  10.0.1.102
+                │    container-3   │  10.0.1.103
+                └─────────────────┘
+```
+
+A single Ubuntu server runs behind the firewall on the DHCP subnet. In **local mode**, all traffic comes from one IP. In **Docker mode**, each simulated client runs in its own container on a macvlan network, giving it a unique IP on the firewall's subnet.
+
 ## Quick Start
 
 ```bash
@@ -35,7 +61,26 @@ Each round interleaves blocked/alerted traffic with legitimate "allowed" traffic
 
 ## Multi-Client
 
-The generator simulates multiple clients with different browser fingerprints (user agents, viewports, timezones). For actual source IP diversity in firewall reports, use the **IP Aliasing** section in the web GUI's Configuration tab to add extra IPs to your network interface, then assign them to client profiles.
+The generator simulates multiple clients with different browser fingerprints (user agents, viewports, timezones).
+
+### Docker Clients (recommended for source IP diversity)
+
+For traffic to appear from different source IPs in firewall reports, use **Docker macvlan mode**. Each client runs in its own Docker container with a unique IP on the firewall's DHCP subnet. All traffic types (browser, DNS, ping, TCP, SSH) originate from that container's IP.
+
+Setup via the web GUI Configuration tab:
+
+1. Configure the parent interface, subnet, and gateway in the **Docker Clients** card
+2. Add containers with names matching your client profiles and IPs from the subnet
+3. **Build Image** (one-time, takes a few minutes)
+4. **Create Network** to set up the macvlan
+5. **Start All** to launch containers
+6. Enable Docker mode and start the traffic generator
+
+Each container runs its own Chromium instance (~512 MB RAM per container).
+
+### IP Aliasing (legacy, ping-only)
+
+IP aliasing adds secondary addresses to the host interface. This only affects `ping` traffic — browser, DNS, TCP, and SSH still use the host's primary IP. Use Docker mode instead for full source IP diversity.
 
 ## CLI Options
 
@@ -87,6 +132,7 @@ Edit via the web GUI Configuration tab, or directly in `config.json`:
 - **client_profiles**: Browser fingerprints and source IPs for multi-client simulation
 - **categories**: Targets for each firewall service (enable/disable individually)
 - **legitimate_traffic**: Pool of allowed domains, URLs, and ping targets
+- **docker**: macvlan client mode settings (interface, subnet, container IPs)
 
 ## IP & URL Reputation
 
@@ -103,14 +149,16 @@ These targets change over time — refresh periodically.
 ```
 config.json              # All targets and settings
 requirements.txt         # Python dependencies
-install.sh               # One-time Ubuntu setup (deps, venv, sudoers)
+install.sh               # One-time Ubuntu setup (deps, Docker, venv, sudoers)
 run.sh                   # Launch wrapper (uses venv automatically)
+Dockerfile               # Docker worker container image
 traffic_generator.py     # Legacy single-pass script (still works)
 demo_generator/          # Multi-client package
 ├── __main__.py          # CLI entry point (--web default)
 ├── config.py            # Config loading and defaults
 ├── engine.py            # Round scheduler with run modes
 ├── clients.py           # Multi-client browser context pool
+├── docker_clients.py    # Docker macvlan client pool
 ├── logger.py            # Dual console + file logging
 ├── stats.py             # Statistics tracking
 ├── primitives.py        # Async test functions (ping, DNS, web, SSH, TCP)
@@ -124,10 +172,12 @@ demo_generator/          # Multi-client package
 │   ├── security.py
 │   ├── ip_reputation.py
 │   └── url_reputation.py
+├── worker/              # Docker container worker service
+│   └── service.py       # FastAPI app accepting category run commands
 ├── web/                 # FastAPI web GUI (default)
 │   ├── server.py        # FastAPI app + uvicorn
 │   ├── run_manager.py   # Engine lifecycle manager
-│   ├── routes_api.py    # REST API + IP aliasing endpoints
+│   ├── routes_api.py    # REST API + IP aliasing + Docker endpoints
 │   ├── routes_ws.py     # WebSocket log streaming
 │   └── static/          # Frontend assets
 └── tui/                 # Textual terminal UI (legacy)

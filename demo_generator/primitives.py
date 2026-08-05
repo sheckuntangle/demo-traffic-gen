@@ -18,6 +18,22 @@ class TestResult:
     client_name: str = ""
     category: str = ""
 
+    def to_dict(self):
+        return {
+            "test_type": self.test_type,
+            "target": self.target,
+            "success": self.success,
+            "message": self.message,
+            "status_code": self.status_code,
+            "duration_ms": self.duration_ms,
+            "client_name": self.client_name,
+            "category": self.category,
+        }
+
+    @classmethod
+    def from_dict(cls, d):
+        return cls(**d)
+
 
 async def ping(ip, name="", source_ip=None, timeout=5):
     start = time.monotonic()

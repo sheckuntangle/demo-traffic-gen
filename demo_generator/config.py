@@ -29,6 +29,17 @@ GENERATOR_DEFAULTS = {
     "browser_recycle_rounds": 10,
 }
 
+DOCKER_DEFAULTS = {
+    "enabled": False,
+    "image_name": "demo-generator-worker",
+    "network_name": "demogen-macvlan",
+    "parent_interface": "",
+    "subnet": "",
+    "gateway": "",
+    "worker_port": 8090,
+    "containers": [],
+}
+
 
 def load_config(config_path="config.json"):
     if not os.path.exists(config_path):
@@ -45,6 +56,10 @@ def load_config(config_path="config.json"):
     config.setdefault("client_profiles", [])
     config.setdefault("categories", {})
     config.setdefault("legitimate_traffic", {"dns_domains": [], "web_urls": [], "ping_targets": []})
+
+    config.setdefault("docker", {})
+    for key, default in DOCKER_DEFAULTS.items():
+        config["docker"].setdefault(key, default)
 
     for cat_name in REQUIRED_CATEGORY_KEYS:
         if cat_name in config["categories"]:

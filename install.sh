@@ -13,7 +13,9 @@ if [[ $EUID -ne 0 ]]; then
     exec sudo --preserve-env=HOME "$0" "$@"
 fi
 
-echo "[1/4] Installing system packages..."
+REAL_USER="${SUDO_USER:-$(whoami)}"
+
+echo "[1/6] Installing system packages..."
 apt-get update -qq
 apt-get install -y -qq \
     python3 \
@@ -23,23 +25,37 @@ apt-get install -y -qq \
     iputils-ping \
     dnsutils \
     openssh-client \
+    curl \
     > /dev/null
 
-echo "[2/4] Creating Python virtual environment..."
+echo "[2/6] Installing Docker..."
+if command -v docker &> /dev/null; then
+    echo "  Docker already installed: $(docker --version)"
+else
+    curl -fsSL https://get.docker.com | sh
+    echo "  Docker installed: $(docker --version)"
+fi
+if ! groups "$REAL_USER" | grep -q docker; then
+    usermod -aG docker "$REAL_USER"
+    echo "  Added $REAL_USER to docker group (re-login required for docker commands)"
+fi
+systemctl enable docker
+systemctl start docker
+
+echo "[3/6] Creating Python virtual environment..."
 python3 -m venv "$VENV_DIR"
 source "$VENV_DIR/bin/activate"
 
-echo "[3/4] Installing Python dependencies..."
+echo "[4/6] Installing Python dependencies..."
 pip install -q -r "$SCRIPT_DIR/requirements.txt"
 
-echo "[4/4] Installing Playwright Chromium browser (including system deps)..."
+echo "[5/6] Installing Playwright Chromium browser (including system deps)..."
 python3 -m playwright install --with-deps chromium
 
-REAL_USER="${SUDO_USER:-$(whoami)}"
+echo "[6/6] Setting up sudoers for IP aliasing..."
 mkdir -p "$SCRIPT_DIR/logs"
 chown -R "$REAL_USER":"$REAL_USER" "$SCRIPT_DIR/logs" "$VENV_DIR"
 
-echo "[5/5] Setting up sudoers for IP aliasing..."
 SUDOERS_FILE="/etc/sudoers.d/demo-traffic-gen"
 cat > "$SUDOERS_FILE" <<SUDOERS
 # Allow the traffic generator web GUI to manage IP aliases
@@ -56,3 +72,7 @@ echo ""
 echo "Run the generator:"
 echo "  ./run.sh              # Web GUI at http://localhost:8080"
 echo "  ./run.sh --headless   # Console-only mode"
+echo ""
+echo "Docker client mode:"
+echo "  Configure macvlan clients in the web GUI Configuration tab"
+echo "  Requires re-login if you were just added to the docker group"

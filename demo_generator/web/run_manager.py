@@ -23,6 +23,7 @@ class RunManager:
         )
         self.stats = Stats()
         self._pool = ClientPool(config)
+        self._docker_pool = None
         self._engine = None
         self._run_task = None
         self._mode = None
@@ -65,7 +66,10 @@ class RunManager:
             raise RuntimeError("Engine is already running")
 
         self._mode = RunMode(mode)
-        self._engine = Engine(self.config, self.logger, self.stats, pool=self._pool)
+        pool = self._pool
+        if self.config.get("docker", {}).get("enabled") and self._docker_pool and self._docker_pool.is_started:
+            pool = self._docker_pool
+        self._engine = Engine(self.config, self.logger, self.stats, pool=pool)
 
         self._engine.on("on_round_start", lambda **kw: self.broadcast({
             "type": "round_start", "data": kw
@@ -136,7 +140,15 @@ class RunManager:
                 pass
             raise
 
+    def get_docker_pool(self):
+        if self._docker_pool is None:
+            from ..docker_clients import DockerClientPool
+            self._docker_pool = DockerClientPool(self.config)
+        return self._docker_pool
+
     async def cleanup(self):
         await self.stop()
         await self._pool.cleanup()
+        if self._docker_pool:
+            await self._docker_pool.cleanup()
         self.logger.close()

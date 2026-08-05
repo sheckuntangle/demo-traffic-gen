@@ -10,7 +10,7 @@ from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
 from .run_manager import RunManager
-from .routes_api import router as api_router
+from .routes_api import router as api_router, docker_router
 from .routes_ws import router as ws_router
 
 STATIC_DIR = os.path.join(os.path.dirname(__file__), "static")
@@ -39,6 +39,7 @@ def create_app(config, config_path):
 
     app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
     app.include_router(api_router, prefix="/api")
+    app.include_router(docker_router, prefix="/api")
     app.include_router(ws_router)
 
     @app.get("/")

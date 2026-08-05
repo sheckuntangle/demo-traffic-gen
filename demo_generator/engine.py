@@ -254,11 +254,7 @@ class Engine:
                               f"[{client_name}] Running {category.display_name} tests")
 
             try:
-                results = await category.run(
-                    client.browser_context,
-                    self._config,
-                    source_ip=source_ip,
-                )
+                results = await client.run_category(category, self._config)
             except Exception as e:
                 self._logger.log_result(
                     category.name, "ERROR", "category execution",
