@@ -2,10 +2,16 @@
 
 import asyncio
 import logging
+import random
 from dataclasses import dataclass
 from typing import Optional
 
-from .clients import ClientProfile
+from .clients import (
+    ClientProfile,
+    FALLBACK_USER_AGENTS,
+    FALLBACK_VIEWPORTS,
+    FALLBACK_TIMEZONES,
+)
 from .primitives import TestResult
 
 logger = logging.getLogger("demo_generator.docker")
@@ -181,19 +187,12 @@ class DockerClientPool:
         macvlan, mgmt = self._network_mgr.create_networks()
 
         ips = self._generate_ips(start_ip, client_count)
-        profiles = self._config.get("client_profiles", [])
-
-        containers_conf = []
-        for i in range(client_count):
-            profile_data = profiles[i % len(profiles)] if profiles else {}
-            name = profile_data.get("name", f"client-{i + 1}")
-            containers_conf.append({"name": name, "ip": ips[i], "profile_data": profile_data})
 
         await asyncio.to_thread(self._remove_stale_containers)
 
         tasks = [
-            self._start_container(c, image_name, macvlan, mgmt)
-            for c in containers_conf
+            self._start_container(ip, image_name, macvlan, mgmt)
+            for ip in ips
         ]
         results = await asyncio.gather(*tasks, return_exceptions=True)
         for r in results:
@@ -212,21 +211,21 @@ class DockerClientPool:
             except Exception as e:
                 logger.warning(f"Could not remove '{c.name}': {e}")
 
-    async def _start_container(self, container_conf, image_name, macvlan, mgmt):
-        name = container_conf["name"]
-        ip = container_conf["ip"]
-        container_name = f"{CONTAINER_PREFIX}{name}"
+    async def _start_container(self, ip, image_name, macvlan, mgmt):
+        ip_slug = ip.replace(".", "-")
+        container_name = f"{CONTAINER_PREFIX}{ip_slug}"
 
-        profile_data = container_conf.get("profile_data", {})
-        viewport = profile_data.get("viewport", {"width": 1920, "height": 1080})
+        viewport = random.choice(FALLBACK_VIEWPORTS)
+        user_agent = random.choice(FALLBACK_USER_AGENTS)
+        timezone = random.choice(FALLBACK_TIMEZONES)
 
         env = {
-            "WORKER_PROFILE_NAME": name,
-            "WORKER_USER_AGENT": profile_data.get("user_agent", ""),
-            "WORKER_VIEWPORT_WIDTH": str(viewport.get("width", 1920)),
-            "WORKER_VIEWPORT_HEIGHT": str(viewport.get("height", 1080)),
-            "WORKER_TIMEZONE": profile_data.get("timezone", "America/New_York"),
-            "WORKER_LOCALE": profile_data.get("locale", "en-US"),
+            "WORKER_PROFILE_NAME": ip,
+            "WORKER_USER_AGENT": user_agent,
+            "WORKER_VIEWPORT_WIDTH": str(viewport["width"]),
+            "WORKER_VIEWPORT_HEIGHT": str(viewport["height"]),
+            "WORKER_TIMEZONE": timezone,
+            "WORKER_LOCALE": "en-US",
         }
 
         network_name = self._config["docker"].get("network_name", "demogen-macvlan")
@@ -242,27 +241,19 @@ class DockerClientPool:
             shm_size="256m",
         )
 
-        # Set the static IP on the macvlan network
-        await asyncio.to_thread(
-            macvlan.disconnect, container,
-        )
-        await asyncio.to_thread(
-            macvlan.connect, container, ipv4_address=ip,
-        )
-
-        # Attach to management bridge for host-to-container API calls
+        await asyncio.to_thread(macvlan.disconnect, container)
+        await asyncio.to_thread(macvlan.connect, container, ipv4_address=ip)
         await asyncio.to_thread(mgmt.connect, container)
 
-        # Get the management IP
         await asyncio.to_thread(container.reload)
         mgmt_ip = container.attrs["NetworkSettings"]["Networks"][MGMT_NETWORK_NAME]["IPAddress"]
 
         profile = ClientProfile(
-            name=name,
-            user_agent=profile_data.get("user_agent", ""),
+            name=ip,
+            user_agent=user_agent,
             viewport=viewport,
-            timezone=profile_data.get("timezone", "America/New_York"),
-            locale=profile_data.get("locale", "en-US"),
+            timezone=timezone,
+            locale="en-US",
             source_ip=ip,
         )
 
@@ -275,7 +266,7 @@ class DockerClientPool:
         )
 
         await self._wait_for_health(client)
-        logger.info(f"Container '{name}' ready at macvlan={ip} mgmt={mgmt_ip}")
+        logger.info(f"Container {ip} ready (mgmt={mgmt_ip})")
         return client
 
     async def _wait_for_health(self, client, timeout=60):

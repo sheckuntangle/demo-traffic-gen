@@ -105,14 +105,6 @@ async def update_generator_config(request: Request):
     return {"status": "saved"}
 
 
-@router.put("/config/clients")
-async def update_client_profiles(request: Request):
-    manager = request.app.state.manager
-    data = await request.json()
-    manager.update_config("clients", None, data)
-    return {"status": "saved"}
-
-
 @router.put("/config/legitimate")
 async def update_legitimate_config(request: Request):
     manager = request.app.state.manager

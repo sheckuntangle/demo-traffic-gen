@@ -298,7 +298,6 @@ const App = {
         }
         try { await this.loadNetworkInterfaces(); console.log("[loadConfig] interfaces OK"); } catch (e) { console.error("[loadConfig] interfaces error:", e); }
         try { this.renderGeneratorSettings(); console.log("[loadConfig] generator OK"); } catch (e) { console.error("[loadConfig] renderGeneratorSettings error:", e); }
-        try { this.renderClientProfiles(); console.log("[loadConfig] profiles OK"); } catch (e) { console.error("[loadConfig] renderClientProfiles error:", e); }
         try { this.renderCategoryConfigs(); console.log("[loadConfig] categories OK"); } catch (e) { console.error("[loadConfig] renderCategoryConfigs error:", e); }
         try { this.renderLegitConfig(); console.log("[loadConfig] legit OK"); } catch (e) { console.error("[loadConfig] renderLegitConfig error:", e); }
         try { await this.loadDockerStatus(); console.log("[loadConfig] docker OK"); } catch (e) { console.error("[loadConfig] docker error:", e); }
@@ -381,77 +380,6 @@ const App = {
     async loadNetworkInterfaces() {
         const res = await fetch("/api/network/interfaces");
         this.interfaces = await res.json();
-    },
-
-    renderClientProfiles() {
-        const profiles = this.config.client_profiles || [];
-        const container = document.getElementById("client-profiles-config");
-        let html = `<p class="text-muted small">Each client simulates a different user with a unique browser fingerprint. In Docker mode, profiles are cycled across containers automatically.</p>`;
-
-        html += `<table class="table table-sm target-table" id="table-client-profiles">
-            <thead><tr>
-                <th>Name</th><th>User Agent</th><th>Viewport</th><th>Timezone</th><th>Source IP</th><th></th>
-            </tr></thead><tbody>`;
-
-        for (const p of profiles) {
-            const vp = p.viewport ? `${p.viewport.width}x${p.viewport.height}` : "";
-            html += `<tr>
-                <td><input type="text" class="form-control form-control-sm" data-field="name" value="${this.esc(p.name || "")}"></td>
-                <td><input type="text" class="form-control form-control-sm" data-field="user_agent" value="${this.esc(p.user_agent || "")}"></td>
-                <td><input type="text" class="form-control form-control-sm" data-field="viewport" value="${this.esc(vp)}" placeholder="1920x1080"></td>
-                <td><input type="text" class="form-control form-control-sm" data-field="timezone" value="${this.esc(p.timezone || "")}"></td>
-                <td><input type="text" class="form-control form-control-sm" data-field="source_ip" value="${this.esc(p.source_ip || "")}" placeholder="e.g. 10.0.1.101"></td>
-                <td><button class="btn btn-sm btn-outline-danger" onclick="this.closest('tr').remove()">X</button></td>
-            </tr>`;
-        }
-
-        html += `</tbody></table>`;
-        html += `<button class="btn btn-sm btn-outline-light mb-2" onclick="App.addClientProfile()">+ Add Profile</button> `;
-        html += `<button class="btn btn-primary btn-sm mb-2" onclick="App.saveClientProfiles()">Save Client Profiles</button>`;
-        container.innerHTML = html;
-    },
-
-    addClientProfile() {
-        const tbody = document.querySelector("#table-client-profiles tbody");
-        const tr = document.createElement("tr");
-        tr.innerHTML = `
-            <td><input type="text" class="form-control form-control-sm" data-field="name" value=""></td>
-            <td><input type="text" class="form-control form-control-sm" data-field="user_agent" value=""></td>
-            <td><input type="text" class="form-control form-control-sm" data-field="viewport" value="1920x1080" placeholder="1920x1080"></td>
-            <td><input type="text" class="form-control form-control-sm" data-field="timezone" value="America/New_York"></td>
-            <td><input type="text" class="form-control form-control-sm" data-field="source_ip" value="" placeholder="e.g. 10.0.1.101"></td>
-            <td><button class="btn btn-sm btn-outline-danger" onclick="this.closest('tr').remove()">X</button></td>`;
-        tbody.appendChild(tr);
-    },
-
-    async saveClientProfiles() {
-        const rows = document.querySelectorAll("#table-client-profiles tbody tr");
-        const profiles = [];
-        rows.forEach(row => {
-            const get = (f) => row.querySelector(`[data-field="${f}"]`).value.trim();
-            const name = get("name");
-            if (!name) return;
-            const vpStr = get("viewport");
-            const vpParts = vpStr.split("x");
-            const viewport = vpParts.length === 2
-                ? {width: parseInt(vpParts[0]) || 1920, height: parseInt(vpParts[1]) || 1080}
-                : {width: 1920, height: 1080};
-            profiles.push({
-                name: name,
-                user_agent: get("user_agent"),
-                viewport: viewport,
-                timezone: get("timezone") || "America/New_York",
-                locale: "en-US",
-                source_ip: get("source_ip") || null,
-            });
-        });
-        await fetch("/api/config/clients", {
-            method: "PUT",
-            headers: {"Content-Type": "application/json"},
-            body: JSON.stringify(profiles),
-        });
-        this.config.client_profiles = profiles;
-        this.showToast("Client profiles saved");
     },
 
     renderCategoryConfigs() {

@@ -92,27 +92,9 @@ class ClientPool:
 
     def _build_profiles(self):
         profiles = []
-        configured = self._config.get("client_profiles", [])
-        docker_conf = self._config.get("docker", {})
-        if docker_conf.get("enabled"):
-            client_count = docker_conf.get("client_count", 3)
-        else:
-            client_count = max(1, len(configured)) if configured else 1
-
-        for p in configured[:client_count]:
+        for i in range(1):
             profiles.append(ClientProfile(
-                name=p["name"],
-                user_agent=p["user_agent"],
-                viewport=p["viewport"],
-                timezone=p["timezone"],
-                locale=p["locale"],
-                source_ip=p.get("source_ip"),
-            ))
-
-        i = len(profiles)
-        while len(profiles) < client_count:
-            profiles.append(ClientProfile(
-                name=f"client-{i + 1}",
+                name="local",
                 user_agent=random.choice(FALLBACK_USER_AGENTS),
                 viewport=random.choice(FALLBACK_VIEWPORTS),
                 timezone=random.choice(FALLBACK_TIMEZONES),
