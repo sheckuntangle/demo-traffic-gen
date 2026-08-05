@@ -110,6 +110,8 @@ class RunManager:
                 await asyncio.wait_for(self._run_task, timeout=10)
             except (asyncio.TimeoutError, asyncio.CancelledError):
                 pass
+        self._run_task = None
+        self.broadcast({"type": "status", "data": self.get_status()})
         if self._docker_pool and self._docker_pool.is_started:
             self.logger.info("SYSTEM", "Stopping Docker containers...")
             await self._docker_pool.cleanup()

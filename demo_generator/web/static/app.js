@@ -102,6 +102,9 @@ const App = {
 
     async stop() {
         await fetch("/api/stop", {method: "POST"});
+        document.getElementById("start-btn").disabled = false;
+        document.getElementById("stop-btn").disabled = true;
+        document.getElementById("mode-select").disabled = false;
     },
 
     async runCategory(name) {
