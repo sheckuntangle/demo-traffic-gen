@@ -44,8 +44,14 @@ DOCKER_DEFAULTS = {
 
 def load_config(config_path="config.json"):
     if not os.path.exists(config_path):
-        print(f"Error: Config file not found: {config_path}", file=sys.stderr)
-        sys.exit(1)
+        import shutil
+        example = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "config.example.json")
+        if os.path.exists(example):
+            shutil.copy2(example, config_path)
+            print(f"Created {config_path} from {example}")
+        else:
+            print(f"Error: Config file not found: {config_path}", file=sys.stderr)
+            sys.exit(1)
 
     with open(config_path, "r") as f:
         config = json.load(f)
