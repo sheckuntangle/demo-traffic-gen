@@ -32,12 +32,6 @@ echo "-> Request sent"
 echo ""
 sleep 2
 
-echo "Test A3: SID 2029923 - IP Check (ip.jsontest.com)"
-curl -s "http://ip.jsontest.com/" > /dev/null 2>&1
-echo "-> Request sent"
-echo ""
-sleep 2
-
 # ==========================================
 # REJECT TESTS (Using Reliable SQLi Triggers)
 # ==========================================
