@@ -1,0 +1,26 @@
+# Controller image for the web/headless traffic generator. The root Dockerfile
+# remains the image definition for dynamically spawned workers.
+FROM mcr.microsoft.com/playwright/python:v1.62.0-jammy
+
+RUN apt-get update -qq \
+    && apt-get install -y -qq --no-install-recommends \
+        curl \
+        dnsutils \
+        docker.io \
+        iproute2 \
+        iputils-ping \
+        openssh-client \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+# The complete project, including the root Dockerfile, is required because
+# Docker client mode asks the host daemon to build the worker image from /app.
+COPY . .
+
+EXPOSE 8080
+
+CMD ["python", "-m", "demo_generator", "--config", "/data/config.json", "--log-dir", "/data/logs"]

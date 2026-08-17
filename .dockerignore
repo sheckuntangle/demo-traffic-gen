@@ -1,5 +1,6 @@
 venv/
 logs/
+data/
 .git/
 __pycache__/
 .claude/
