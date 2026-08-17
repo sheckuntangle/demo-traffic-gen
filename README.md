@@ -57,6 +57,33 @@ build worker images and create macvlan networks and traffic containers. Access
 to that socket is effectively host-root access; only run this deployment from a
 trusted checkout on a trusted host.
 
+### For Running Through Bastion Configured Test Beds
+
+For running through Bastion configured test beds - add this iptables rule to
+the bastion host. It forwards unused bastion TCP port `8080` to the Compose
+host at TCP port `8080`.
+
+The supplied NAT table does not use port `8080`; append this DNAT rule to its
+existing `CONSOLE` chain (replace the example with the Compose host's LAN IP):
+
+```bash
+GENERATOR_HOST_IP=192.168.0.200
+iptables -t nat -A CONSOLE -p tcp --dport 8080 -j DNAT --to-destination "${GENERATOR_HOST_IP}:8080"
+```
+
+Browse to `http://<bastion-ip>:8080` after the controller is running.
+
+The existing `POSTROUTING` MASQUERADE rules provide the return path. If the
+bastion's `FORWARD` policy or rules do not already allow this traffic, enable
+forwarding and add the matching allow rule:
+
+```bash
+sysctl -w net.ipv4.ip_forward=1
+iptables -C FORWARD -p tcp -d "${GENERATOR_HOST_IP}" --dport 8080 -j ACCEPT || iptables -A FORWARD -p tcp -d "${GENERATOR_HOST_IP}" --dport 8080 -j ACCEPT
+```
+
+Persist the rules using the bastion host's normal firewall-management method.
+
 ### Legacy Native Installation
 
 The original Ubuntu-host workflow remains available when Docker is not the
