@@ -58,6 +58,9 @@ if $NEED_DEADSNAKES; then
             echo "  Standalone Python already installed at $PY_PREFIX"
         fi
         PYTHON="$PY_PREFIX/bin/python3.10"
+        # Standalone Python has clang hardcoded; override to use system gcc
+        apt-get install -y -qq build-essential > /dev/null
+        export CC=gcc CXX=g++
     fi
     # Rebuild venv if it was created with the old Python
     if [[ -d "$VENV_DIR" ]]; then
