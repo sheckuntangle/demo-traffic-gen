@@ -14,14 +14,40 @@ if [[ $EUID -ne 0 ]]; then
 fi
 
 REAL_USER="${SUDO_USER:-$(whoami)}"
+MIN_PYTHON=(3 8)
 
 echo "[1/6] Installing system packages..."
 apt-get update -qq
-PKG_LIST=(python3 python3-pip python3-venv iputils-ping dnsutils openssh-client curl)
+
+# Check if system python3 meets the minimum version
+NEED_DEADSNAKES=false
+if command -v python3 &>/dev/null; then
+    PY_VER=$(python3 -c 'import sys; print(sys.version_info.major, sys.version_info.minor)')
+    PY_MAJ=${PY_VER%% *}; PY_MIN=${PY_VER##* }
+    if (( PY_MAJ < MIN_PYTHON[0] || (PY_MAJ == MIN_PYTHON[0] && PY_MIN < MIN_PYTHON[1]) )); then
+        NEED_DEADSNAKES=true
+    fi
+else
+    NEED_DEADSNAKES=true
+fi
+
+if $NEED_DEADSNAKES; then
+    echo "  System Python is too old (need >= ${MIN_PYTHON[0]}.${MIN_PYTHON[1]}). Installing Python 3.10 from deadsnakes PPA..."
+    apt-get install -y -qq software-properties-common > /dev/null
+    add-apt-repository -y ppa:deadsnakes/ppa > /dev/null 2>&1
+    apt-get update -qq
+    apt-get install -y -qq python3.10 python3.10-venv python3.10-distutils > /dev/null
+    PYTHON=python3.10
+else
+    PYTHON=python3
+fi
+
+PKG_LIST=(iputils-ping dnsutils openssh-client curl)
 if apt-cache show python3-full &>/dev/null; then
     PKG_LIST+=(python3-full)
 fi
 apt-get install -y -qq "${PKG_LIST[@]}" > /dev/null
+echo "  Using $($PYTHON --version)"
 
 echo "[2/6] Installing Docker..."
 if command -v docker &> /dev/null; then
@@ -38,14 +64,13 @@ systemctl enable docker
 systemctl start docker
 
 echo "[3/6] Creating Python virtual environment..."
-python3 -m venv "$VENV_DIR"
-source "$VENV_DIR/bin/activate"
+$PYTHON -m venv "$VENV_DIR"
 
 echo "[4/6] Installing Python dependencies..."
-pip install -q -r "$SCRIPT_DIR/requirements.txt"
+"$VENV_DIR/bin/pip" install -q -r "$SCRIPT_DIR/requirements.txt"
 
 echo "[5/6] Installing Playwright Chromium browser (including system deps)..."
-python3 -m playwright install --with-deps chromium
+"$VENV_DIR/bin/python3" -m playwright install --with-deps chromium
 
 echo "[6/6] Setting up sudoers for IP aliasing..."
 mkdir -p "$SCRIPT_DIR/logs"
