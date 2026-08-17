@@ -32,12 +32,44 @@ else
 fi
 
 if $NEED_DEADSNAKES; then
-    echo "  System Python is too old (need >= ${MIN_PYTHON[0]}.${MIN_PYTHON[1]}). Installing Python 3.10 from deadsnakes PPA..."
-    apt-get install -y -qq software-properties-common > /dev/null
-    add-apt-repository -y ppa:deadsnakes/ppa > /dev/null 2>&1
-    apt-get update -qq
-    apt-get install -y -qq python3.10 python3.10-venv python3.10-distutils > /dev/null
-    PYTHON=python3.10
+    echo "  System Python is too old (need >= ${MIN_PYTHON[0]}.${MIN_PYTHON[1]}). Installing a newer Python..."
+    PPA_OK=false
+    if apt-get install -y -qq software-properties-common > /dev/null 2>&1; then
+        if add-apt-repository -y ppa:deadsnakes/ppa 2>&1 && apt-get update -qq 2>&1; then
+            if apt-get install -y -qq python3.10 python3.10-venv python3.10-distutils > /dev/null 2>&1; then
+                PPA_OK=true
+            fi
+        fi
+    fi
+    if $PPA_OK; then
+        PYTHON=python3.10
+    else
+        echo "  deadsnakes PPA not available for this Ubuntu release, building Python 3.10 from source..."
+        BUILD_DEPS=(build-essential libssl-dev zlib1g-dev libffi-dev libsqlite3-dev
+                    libbz2-dev libreadline-dev libncurses5-dev liblzma-dev)
+        apt-get install -y -qq "${BUILD_DEPS[@]}" wget > /dev/null
+        PY_SRC_VER=3.10.14
+        PY_PREFIX=/usr/local/python${PY_SRC_VER%.*}
+        if [[ ! -x "$PY_PREFIX/bin/python3" ]]; then
+            WORK=$(mktemp -d)
+            wget -qO "$WORK/python.tgz" "https://www.python.org/ftp/python/$PY_SRC_VER/Python-$PY_SRC_VER.tgz"
+            tar xzf "$WORK/python.tgz" -C "$WORK"
+            (cd "$WORK/Python-$PY_SRC_VER" && \
+                ./configure --prefix="$PY_PREFIX" --enable-optimizations --with-ensurepip=install -q && \
+                make -j"$(nproc)" -s && \
+                make altinstall -s)
+            rm -rf "$WORK"
+        else
+            echo "  Python already built at $PY_PREFIX"
+        fi
+        ln -sf "$PY_PREFIX/bin/python3.10" /usr/local/bin/python3.10
+        PYTHON=python3.10
+    fi
+    # Rebuild venv if it was created with the old Python
+    if [[ -d "$VENV_DIR" ]]; then
+        echo "  Removing old venv (wrong Python version)..."
+        rm -rf "$VENV_DIR"
+    fi
 else
     PYTHON=python3
 fi
