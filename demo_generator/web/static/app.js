@@ -479,7 +479,7 @@ const App = {
         }
 
         html += `</tbody></table>`;
-        html += `<button class="btn btn-sm btn-outline-light mb-3" onclick="App.addRow('${tableId}', ${JSON.stringify(fields)})">+ Add</button>`;
+        html += `<button class="btn btn-sm btn-outline-light mb-3" onclick="App.addRow('${tableId}', ${JSON.stringify(fields).replace(/"/g, '&quot;')})">+ Add</button>`;
         return html;
     },
 
