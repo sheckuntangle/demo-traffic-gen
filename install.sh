@@ -44,26 +44,20 @@ if $NEED_DEADSNAKES; then
     if $PPA_OK; then
         PYTHON=python3.10
     else
-        echo "  deadsnakes PPA not available for this Ubuntu release, building Python 3.10 from source..."
-        BUILD_DEPS=(build-essential libssl-dev zlib1g-dev libffi-dev libsqlite3-dev
-                    libbz2-dev libreadline-dev libncurses5-dev liblzma-dev)
-        apt-get install -y -qq "${BUILD_DEPS[@]}" wget > /dev/null
-        PY_SRC_VER=3.10.14
-        PY_PREFIX=/usr/local/python${PY_SRC_VER%.*}
-        if [[ ! -x "$PY_PREFIX/bin/python3" ]]; then
+        echo "  deadsnakes PPA not available, downloading pre-built Python 3.10..."
+        PY_PREFIX=/opt/python3.10
+        if [[ ! -x "$PY_PREFIX/bin/python3.10" ]]; then
+            ARCH=$(uname -m)
+            PY_URL="https://github.com/indygreg/python-build-standalone/releases/download/20240726/cpython-3.10.14+20240726-${ARCH}-unknown-linux-gnu-install_only.tar.gz"
             WORK=$(mktemp -d)
-            wget -qO "$WORK/python.tgz" "https://www.python.org/ftp/python/$PY_SRC_VER/Python-$PY_SRC_VER.tgz"
-            tar xzf "$WORK/python.tgz" -C "$WORK"
-            (cd "$WORK/Python-$PY_SRC_VER" && \
-                ./configure --prefix="$PY_PREFIX" --enable-optimizations --with-ensurepip=install -q && \
-                make -j"$(nproc)" -s && \
-                make altinstall -s)
+            curl -fsSL -o "$WORK/python.tar.gz" "$PY_URL"
+            mkdir -p "$PY_PREFIX"
+            tar xzf "$WORK/python.tar.gz" -C "$PY_PREFIX" --strip-components=1
             rm -rf "$WORK"
         else
-            echo "  Python already built at $PY_PREFIX"
+            echo "  Standalone Python already installed at $PY_PREFIX"
         fi
-        ln -sf "$PY_PREFIX/bin/python3.10" /usr/local/bin/python3.10
-        PYTHON=python3.10
+        PYTHON="$PY_PREFIX/bin/python3.10"
     fi
     # Rebuild venv if it was created with the old Python
     if [[ -d "$VENV_DIR" ]]; then
