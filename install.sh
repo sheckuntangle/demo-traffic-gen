@@ -17,16 +17,11 @@ REAL_USER="${SUDO_USER:-$(whoami)}"
 
 echo "[1/6] Installing system packages..."
 apt-get update -qq
-apt-get install -y -qq \
-    python3 \
-    python3-pip \
-    python3-venv \
-    python3-full \
-    iputils-ping \
-    dnsutils \
-    openssh-client \
-    curl \
-    > /dev/null
+PKG_LIST=(python3 python3-pip python3-venv iputils-ping dnsutils openssh-client curl)
+if apt-cache show python3-full &>/dev/null; then
+    PKG_LIST+=(python3-full)
+fi
+apt-get install -y -qq "${PKG_LIST[@]}" > /dev/null
 
 echo "[2/6] Installing Docker..."
 if command -v docker &> /dev/null; then
