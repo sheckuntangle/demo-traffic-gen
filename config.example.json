@@ -246,14 +246,14 @@
           "client_ip": ""
         },
         {
-          "ip": "PLACEHOLDER",
-          "description": "PLACEHOLDER - verify with BrightCloud",
+          "ip": "209.141.55.26",
+          "description": "BrightCloud-flagged malicious IP",
           "expected": "reject",
           "client_ip": ""
         },
         {
-          "ip": "PLACEHOLDER",
-          "description": "PLACEHOLDER - verify with BrightCloud",
+          "ip": "209.141.55.26",
+          "description": "BrightCloud-flagged malicious IP",
           "expected": "alert",
           "client_ip": ""
         }
@@ -270,14 +270,14 @@
           "client_ip": ""
         },
         {
-          "url": "http://PLACEHOLDER/",
-          "description": "PLACEHOLDER - verify with BrightCloud",
+          "url": "http://suavasua.vn/",
+          "description": "BrightCloud high-risk URL",
           "expected": "reject",
           "client_ip": ""
         },
         {
-          "url": "http://PLACEHOLDER/",
-          "description": "PLACEHOLDER - verify with BrightCloud",
+          "url": "http://suavasua.vn/",
+          "description": "BrightCloud high-risk URL",
           "expected": "alert",
           "client_ip": ""
         }
