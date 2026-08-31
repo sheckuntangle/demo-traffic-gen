@@ -46,19 +46,23 @@ Ping tests to specific destination addresses:
 
 ## IP Reputation
 
-IP and URL reputation targets can be assigned to specific Docker client IPs in the Configuration tab. Three templates are provided for specific client IPs to generate all actions (block/reject/alert).
+Each Docker macvlan client is assigned a different firewall action via IP-based policy. Configure the client IP for each target in the Configuration tab.
 
-| Threat Level | Firewall Action | Expected Result |
-|-------------|----------------|-----------------|
-| Malicious | block/alert/log | Traffic blocked |
-| Non-malicious | log | Traffic allowed |
+| Client | Firewall Action | Expected Result |
+|--------|----------------|-----------------|
+| Client 1 | block/alert/log | Traffic blocked |
+| Client 2 | reject/alert/log | Traffic rejected |
+| Client 3 | alert/log | Traffic allowed, alert generated |
 
 ## URL Reputation
 
-| Threat Level (URL) | Firewall Action | Expected Result |
-|--------------------|----------------|-----------------|
-| High risk (http://suavasua.vn/) | block/alert/log | Request blocked |
-| Suspicious | reject/alert/log | Request rejected (URL changes frequently, configure as needed) |
+Each Docker macvlan client is assigned a different firewall action via IP-based policy. Configure the client IP for each target in the Configuration tab.
+
+| Client | Firewall Action | Expected Result |
+|--------|----------------|-----------------|
+| Client 1 | block/alert/log | Request blocked |
+| Client 2 | reject/alert/log | Request rejected |
+| Client 3 | alert/log | Request allowed, alert generated |
 
 ## Dynamic Blocklist
 
