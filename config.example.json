@@ -242,7 +242,20 @@
         {
           "ip": "209.141.55.26",
           "description": "BrightCloud-flagged malicious IP",
-          "expected": "block"
+          "expected": "block",
+          "client_ip": ""
+        },
+        {
+          "ip": "PLACEHOLDER",
+          "description": "PLACEHOLDER - verify with BrightCloud",
+          "expected": "reject",
+          "client_ip": ""
+        },
+        {
+          "ip": "PLACEHOLDER",
+          "description": "PLACEHOLDER - verify with BrightCloud",
+          "expected": "alert",
+          "client_ip": ""
         }
       ]
     },
@@ -253,7 +266,20 @@
         {
           "url": "http://suavasua.vn/",
           "description": "BrightCloud high-risk URL",
-          "expected": "block"
+          "expected": "block",
+          "client_ip": ""
+        },
+        {
+          "url": "http://PLACEHOLDER/",
+          "description": "PLACEHOLDER - verify with BrightCloud",
+          "expected": "reject",
+          "client_ip": ""
+        },
+        {
+          "url": "http://PLACEHOLDER/",
+          "description": "PLACEHOLDER - verify with BrightCloud",
+          "expected": "alert",
+          "client_ip": ""
         }
       ]
     },

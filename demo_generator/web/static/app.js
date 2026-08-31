@@ -30,10 +30,10 @@ const CATEGORY_SCHEMAS = {
         {key: "targets", label: "IP Targets", fields: ["ip", "description", "expected"]},
     ],
     ip_reputation: [
-        {key: "targets", label: "Malicious IPs", fields: ["ip", "description", "expected"]},
+        {key: "targets", label: "Malicious IPs", fields: ["ip", "description", "expected", "client_ip"]},
     ],
     url_reputation: [
-        {key: "targets", label: "High-Risk URLs", fields: ["url", "description", "expected"]},
+        {key: "targets", label: "High-Risk URLs", fields: ["url", "description", "expected", "client_ip"]},
     ],
 };
 
@@ -516,19 +516,51 @@ const App = {
         return html;
     },
 
+    _getDockerClientIps() {
+        const docker = this.config.docker || {};
+        if (!docker.enabled || !docker.start_ip || !docker.client_count) return [];
+        const parts = docker.start_ip.split(".").map(Number);
+        if (parts.length !== 4) return [];
+        const ips = [];
+        for (let i = 0; i < docker.client_count; i++) {
+            ips.push(`${parts[0]}.${parts[1]}.${parts[2]}.${parts[3] + i}`);
+        }
+        return ips;
+    },
+
+    _clientIpSelect(val) {
+        const ips = this._getDockerClientIps();
+        let html = `<select class="form-select form-select-sm" data-field="client_ip">`;
+        html += `<option value="" ${!val ? "selected" : ""}>Any</option>`;
+        for (const ip of ips) {
+            html += `<option value="${ip}" ${val === ip ? "selected" : ""}>${ip}</option>`;
+        }
+        html += `</select>`;
+        return html;
+    },
+
+    _dockerEnabled() {
+        return !!(this.config.docker && this.config.docker.enabled && this.config.docker.start_ip);
+    },
+
     renderTargetTable(catName, sectionKey, fields, items) {
         const tableId = `table-${catName}-${sectionKey.replace(/\./g, '-')}`;
+        const showClientIp = this._dockerEnabled();
+        const activeFields = showClientIp ? fields : fields.filter(f => f !== "client_ip");
+
         let html = `<table class="table table-sm target-table mb-2" id="${tableId}">
             <thead><tr>`;
-        for (const f of fields) html += `<th>${f}</th>`;
+        for (const f of activeFields) html += `<th>${f === "client_ip" ? "client IP" : f}</th>`;
         html += `<th></th></tr></thead><tbody>`;
 
         for (let i = 0; i < items.length; i++) {
             html += "<tr>";
-            for (const f of fields) {
+            for (const f of activeFields) {
                 const val = items[i][f] || "";
                 if (f === "expected") {
                     html += `<td>${this._expectedSelect(val)}</td>`;
+                } else if (f === "client_ip") {
+                    html += `<td>${this._clientIpSelect(val)}</td>`;
                 } else {
                     html += `<td><input type="text" class="form-control form-control-sm" data-field="${f}" value="${this.esc(String(val))}"></td>`;
                 }
@@ -542,11 +574,15 @@ const App = {
     },
 
     addRow(tableId, fields) {
+        const showClientIp = this._dockerEnabled();
+        const activeFields = showClientIp ? fields : fields.filter(f => f !== "client_ip");
         const tbody = document.querySelector(`#${tableId} tbody`);
         let tr = document.createElement("tr");
-        for (const f of fields) {
+        for (const f of activeFields) {
             if (f === "expected") {
                 tr.innerHTML += `<td>${this._expectedSelect("block")}</td>`;
+            } else if (f === "client_ip") {
+                tr.innerHTML += `<td>${this._clientIpSelect("")}</td>`;
             } else {
                 tr.innerHTML += `<td><input type="text" class="form-control form-control-sm" data-field="${f}" value=""></td>`;
             }

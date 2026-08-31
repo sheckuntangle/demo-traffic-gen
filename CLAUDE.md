@@ -75,7 +75,7 @@ demo_generator/
 │   ├── web_filter.py  -- marijuana/shopping/sports URLs
 │   ├── dynamic_blocklist.py
 │   ├── security.py
-│   ├── idps.py        -- IDS/IPS signature testing via shell scripts
+│   ├── idps.py        -- Per-signature IDS/IPS testing with expected action support
 │   ├── ip_reputation.py
 │   └── url_reputation.py
 ├── web/               -- FastAPI web GUI (default interface)
@@ -108,16 +108,20 @@ demo_generator/
 | DNS Filter | mlb.com, nfl.com, nba.com | block, reject, alert |
 | Geo-IP | France, Switzerland, Sweden IPs | block, reject, alert |
 | Web Filter | weedmaps, amazon, espn | block, reject, alert |
-| Dynamic Blocklist | 208.67.222.222, ebay, wikipedia | block |
-| Security | 9.9.9.9 | block |
-| IDPS | IDS/IPS signature tests via curl scripts | block |
-| IP Reputation | BrightCloud-flagged IPs | block |
-| URL Reputation | BrightCloud-flagged URLs | block |
+| Dynamic Blocklist | wikipedia, OpenDNS (208.67.220.220), cnn | block, reject, alert |
+| Security | 9.9.9.9, 1.1.1.1, 94.140.14.14 | block, reject, accept |
+| IDPS | Per-signature Suricata tests (SID-based curl scripts) | block, reject, alert |
+| IP Reputation | BrightCloud-flagged IPs (209.141.55.26 + placeholders) | block, reject, alert |
+| URL Reputation | BrightCloud-flagged URLs (suavasua.vn + placeholders) | block, reject, alert |
 | Legitimate | 60+ DNS domains, 115+ web URLs, ping targets | allowed (reporting volume) |
 
 ## Key Patterns
 
 **Adding a category**: Create a new file in `categories/`, subclass `TestCategory`, set `name` and `display_name` class attrs, implement `async def run()`. Registration is automatic via `__init_subclass__`. Add import to `categories/__init__.py`.
+
+**IDPS signatures**: Each signature is a structured config entry with `sid`, `description`, `default_action` (Suricata's default), `expected` (firewall policy action), and `script` (shell command). The category runs each script independently and uses `apply_expected` to determine pass/fail based on whether the firewall blocked/rejected/alerted as expected.
+
+**Per-target client IP**: IP reputation and URL reputation targets support a `client_ip` field to specify which Docker macvlan client should source the traffic. The web UI shows a dropdown of available Docker client IPs (computed from `docker.start_ip` + `docker.client_count`) when Docker mode is enabled. The `client_ip` overrides the category-level `source_ip` for primitives that support it (e.g., ping).
 
 **Client dispatch**: Engine calls `client.run_category(category, config)`. For local clients (`ClientContext`), this calls `category.run()` directly. For Docker clients (`DockerClient`), this POSTs to the container's worker API. The engine doesn't know which type it's using.
 
@@ -131,6 +135,7 @@ demo_generator/
 - Legitimate traffic sample sizes configurable via `dns/web/ping_sample_range` in config
 - IP aliasing managed from the web GUI (sudoers rule set up by install.sh)
 - Config changes saved to config.json atomically via temp file + os.replace()
+- Reset-to-defaults buttons in web GUI (global + per-section), backed by config.example.json
 - Browser contexts recycled every ~10 rounds to prevent memory leaks overnight
 
 ## Commands

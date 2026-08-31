@@ -1,6 +1,6 @@
 # Firewall Demo Traffic Generator
 
-Multi-client, long-running traffic generator for populating firewall reporting dashboards. Generates realistic traffic across 8 firewall service categories with a web-based GUI for control and monitoring.
+Multi-client, long-running traffic generator for populating firewall reporting dashboards. Generates realistic traffic across 9 firewall service categories with a web-based GUI for control and monitoring.
 
 ## Topology
 
@@ -105,10 +105,11 @@ Generates traffic that triggers and populates reporting for these firewall servi
 | **DNS Filter** | mlb.com (block), nfl.com (reject), nba.com (alert) |
 | **Geo-IP** | France (block), Switzerland (reject), Sweden (alert) |
 | **Web Filter** | Marijuana/weedmaps (block), Shopping/amazon (reject), Sports/espn (alert) |
-| **Dynamic Blocklist** | Specific IPs and domains (208.67.222.222, ebay, wikipedia) |
-| **Security** | Blocked IPs (9.9.9.9) |
-| **IP Reputation** | BrightCloud-flagged malicious IPs |
-| **URL Reputation** | BrightCloud-flagged high-risk URLs |
+| **Dynamic Blocklist** | wikipedia (block), OpenDNS 208.67.220.220 (reject), cnn (alert) — tied to external blocklist feeds |
+| **Security** | 9.9.9.9/Quad9 (block), 1.1.1.1/Cloudflare (reject), 94.140.14.14/AdGuard (accept) |
+| **IDPS** | Per-signature Suricata tests — 6 SIDs with configurable default/expected actions and individual curl scripts |
+| **IP Reputation** | BrightCloud-flagged malicious IPs — block/reject/alert, per-target Docker client IP selection |
+| **URL Reputation** | BrightCloud-flagged high-risk URLs — block/reject/alert, per-target Docker client IP selection |
 | **Legitimate Traffic** | High-volume normal browsing, DNS, and pings for realistic reporting |
 
 Each round interleaves blocked/alerted traffic with legitimate "allowed" traffic so the firewall dashboard shows a realistic mix.
@@ -171,7 +172,7 @@ IP aliasing adds secondary addresses to the host interface. This only affects `p
 The web interface at `http://localhost:8080` provides:
 
 - **Dashboard**: Start/Stop controls with three run modes (Full Run, Triggers Only, Legitimate Only), per-category stats cards with "Run Now" buttons, and a live log stream
-- **Configuration**: IP aliasing, client profiles, generator settings, per-category targets (add/remove IPs, URLs, domains), and legitimate traffic pools — all saved to config.json
+- **Configuration**: Generator settings, Docker client config, per-category targets (add/remove IPs, URLs, domains, IDPS signatures), and legitimate traffic pools — all saved to config.json. Each section has a "Reset to Defaults" button, plus a global reset at the top of the page
 - **Run Modes**:
   - **Full Run**: Continuous legitimate traffic with periodic trigger rounds — ideal for overnight demos
   - **Triggers Only**: All enabled categories + legitimate traffic per round
@@ -189,13 +190,15 @@ Edit via the web GUI Configuration tab, or directly in `config.json`:
 
 ## IP & URL Reputation
 
-The `ip_reputation` and `url_reputation` categories need IPs/URLs that your BrightCloud service classifies as malicious/high-risk. The config ships with placeholder values — update them by:
+The `ip_reputation` and `url_reputation` categories need IPs/URLs that your BrightCloud service classifies as malicious/high-risk. Each category ships with 3 entries (block, reject, alert) — some are placeholders. Update them by:
 
 1. Check candidates at [BrightCloud Lookup](https://www.brightcloud.com/tools/url-ip-lookup.php)
 2. Pull from public threat feeds: [abuse.ch Feodo Tracker](https://feodotracker.abuse.ch/), [Spamhaus DROP](https://www.spamhaus.org/drop/), [URLhaus](https://urlhaus.abuse.ch/)
 3. Test against your firewall to confirm they trigger the expected blocks
 
 These targets change over time — refresh periodically.
+
+When Docker client mode is enabled, each reputation target can be assigned a specific Docker client IP via a dropdown in the Configuration tab. This controls which macvlan client sources the test traffic, allowing different targets to appear from different IPs in firewall reports.
 
 ## Files
 
@@ -223,8 +226,9 @@ demo_generator/          # Multi-client package
 │   ├── dns_filter.py    # Domain blocking
 │   ├── geo_ip.py        # Country-based IP blocking
 │   ├── web_filter.py    # URL category filtering
-│   ├── dynamic_blocklist.py
-│   ├── security.py
+│   ├── dynamic_blocklist.py  # IP/domain blocking with external blocklist feeds
+│   ├── security.py          # Security rule ping/TCP tests
+│   ├── idps.py              # Per-signature IDS/IPS testing
 │   ├── ip_reputation.py
 │   └── url_reputation.py
 ├── worker/              # Docker container worker service
@@ -232,7 +236,7 @@ demo_generator/          # Multi-client package
 ├── web/                 # FastAPI web GUI (default)
 │   ├── server.py        # FastAPI app + uvicorn
 │   ├── run_manager.py   # Engine lifecycle manager
-│   ├── routes_api.py    # REST API + IP aliasing + Docker endpoints
+│   ├── routes_api.py    # REST API + config reset + Docker endpoints
 │   ├── routes_ws.py     # WebSocket log streaming
 │   └── static/          # Frontend assets
 └── tui/                 # Textual terminal UI (legacy)

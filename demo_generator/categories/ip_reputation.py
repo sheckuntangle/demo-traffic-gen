@@ -15,8 +15,9 @@ class IpReputation(TestCategory):
 
         for target in cat_config.get("targets", []):
             expected = target.get("expected", "")
+            target_source_ip = target.get("client_ip") or source_ip
 
-            result = await ping(target["ip"], target.get("description", ""), source_ip=source_ip)
+            result = await ping(target["ip"], target.get("description", ""), source_ip=target_source_ip)
             result.category = self.name
             apply_expected(result, expected)
             results.append(result)
