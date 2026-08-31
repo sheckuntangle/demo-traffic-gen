@@ -1,6 +1,7 @@
 """Round-based engine — orchestrates multi-client traffic generation with scheduling."""
 
 import asyncio
+import copy
 import random
 import traceback
 from enum import Enum
@@ -8,6 +9,8 @@ from enum import Enum
 from .categories import get_all_categories
 from .clients import ClientPool
 from .config import get_enabled_categories
+
+CATEGORIES_WITH_CLIENT_IP = {"ip_reputation", "url_reputation"}
 
 
 class RunMode(str, Enum):
@@ -246,10 +249,21 @@ class Engine:
         cats = list(categories)
         random.shuffle(cats)
 
+        client_by_ip = {}
+        for c in clients:
+            if hasattr(c, "macvlan_ip") and c.macvlan_ip:
+                client_by_ip[c.macvlan_ip] = c
+
         tasks = []
         for category in cats:
-            client = random.choice(clients)
-            tasks.append(asyncio.create_task(self._run_category_on_client(client, category)))
+            dispatched = self._dispatch_by_client_ip(
+                category, clients, client_by_ip)
+            if dispatched:
+                tasks.extend(dispatched)
+            else:
+                client = random.choice(clients)
+                tasks.append(asyncio.create_task(
+                    self._run_category_on_client(client, category)))
         self._active_tasks.extend(tasks)
         try:
             await asyncio.gather(*tasks)
@@ -261,6 +275,34 @@ class Engine:
             for t in tasks:
                 if t in self._active_tasks:
                     self._active_tasks.remove(t)
+
+    def _dispatch_by_client_ip(self, category, clients, client_by_ip):
+        if category.name not in CATEGORIES_WITH_CLIENT_IP or not client_by_ip:
+            return None
+        cat_config = self._config.get("categories", {}).get(category.name, {})
+        targets = cat_config.get("targets", [])
+        has_client_ip = any(t.get("client_ip") for t in targets)
+        if not has_client_ip:
+            return None
+
+        groups = {}
+        for target in targets:
+            ip = target.get("client_ip") or ""
+            groups.setdefault(ip, []).append(target)
+
+        tasks = []
+        for ip, group_targets in groups.items():
+            if ip and ip in client_by_ip:
+                client = client_by_ip[ip]
+            else:
+                client = random.choice(clients)
+            config_copy = copy.deepcopy(self._config)
+            config_copy["categories"][category.name]["targets"] = group_targets
+            cat_instance = category.__class__()
+            tasks.append(asyncio.create_task(
+                self._run_category_on_client(
+                    client, cat_instance, config_override=config_copy)))
+        return tasks
 
     def _make_result_callback(self, category, client_name):
         def on_result(result):
@@ -276,7 +318,7 @@ class Engine:
             self._emit("on_test_complete", result=result)
         return on_result
 
-    async def _run_category_on_client(self, client, category):
+    async def _run_category_on_client(self, client, category, config_override=None):
         if self._stop_requested:
             return
 
@@ -286,8 +328,9 @@ class Engine:
 
         category._on_result = self._make_result_callback(category, client_name)
 
+        run_config = config_override or self._config
         try:
-            results = await client.run_category(category, self._config)
+            results = await client.run_category(category, run_config)
         except asyncio.CancelledError:
             raise
         except Exception as e:
