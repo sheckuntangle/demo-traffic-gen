@@ -764,6 +764,7 @@ const App = {
             body: JSON.stringify(data),
         });
         this.config.docker = {...(this.config.docker || {}), ...data};
+        this.renderCategoryConfigs();
         this.showToast("Docker config saved");
     },
 
