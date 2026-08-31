@@ -259,7 +259,50 @@
     },
     "idps": {
       "enabled": true,
-      "script": "#!/bin/sh\nsleep 2\n\n# ==========================================\n# ALERT TESTS (Using Reliable URI Triggers)\n# ==========================================\necho \"========================================\"\necho \" RUNNING ALERT TESTS\"\necho \"========================================\"\necho \"\"\n\necho \"Test A1: SID 2049400 - /etc/passwd Detected in URI\"\ncurl -s \"http://example.com/etc/passwd\" > /dev/null 2>&1\necho \"-> Request sent\"\necho \"\"\nsleep 2\n\necho \"Test A2: SID 2033891 - Observed Suspicious Request nc.exe in URI\"\ncurl -s \"http://example.com/nc.exe\" > /dev/null 2>&1\necho \"-> Request sent\"\necho \"\"\nsleep 2\n\necho \"Test A3: SID 2029923 - IP Check (ip.jsontest.com)\"\ncurl -s \"http://ip.jsontest.com/\" > /dev/null 2>&1\necho \"-> Request sent\"\necho \"\"\nsleep 2\n\n# ==========================================\n# REJECT TESTS (Using Reliable SQLi Triggers)\n# ==========================================\necho \"========================================\"\necho \" RUNNING REJECT TESTS\"\necho \"========================================\"\necho \"\"\n\necho \"Test R1: SID 2007337 - UNION SELECT SQL Injection\"\ncurl -s -m 5 \"http://example.com/index.php?pageid=1%20UNION%20SELECT%20username,password\" > /dev/null 2>&1\necho \"-> Request sent\"\necho \"\"\nsleep 2\n\necho \"Test R2: SID 2006124 - detail.asp UNION SELECT SQL Injection\"\ncurl -s -m 5 \"http://example.com/detail.asp?ID=1%20UNION%20SELECT%20username,password\" > /dev/null 2>&1\necho \"-> Request sent\"\necho \"\"\nsleep 2\n\necho \"Test R3: SID 2005082 - faq.php UNION SELECT SQL Injection\"\ncurl -s -m 5 \"http://example.com/faq.php?id=1%20UNION%20SELECT%20username,password\" > /dev/null 2>&1\necho \"-> Request sent\"\necho \"\"\n\necho \"Testing complete.\"\n"
+      "signatures": [
+        {
+          "sid": "2049400",
+          "description": "/etc/passwd Detected in URI",
+          "default_action": "alert",
+          "expected": "block",
+          "script": "curl -s \"http://example.com/etc/passwd\" > /dev/null 2>&1"
+        },
+        {
+          "sid": "2033891",
+          "description": "Observed Suspicious Request nc.exe in URI",
+          "default_action": "alert",
+          "expected": "reject",
+          "script": "curl -s \"http://example.com/nc.exe\" > /dev/null 2>&1"
+        },
+        {
+          "sid": "2029923",
+          "description": "IP Check (ip.jsontest.com)",
+          "default_action": "alert",
+          "expected": "alert",
+          "script": "curl -s \"http://ip.jsontest.com/\" > /dev/null 2>&1"
+        },
+        {
+          "sid": "2007337",
+          "description": "UNION SELECT SQL Injection",
+          "default_action": "reject",
+          "expected": "block",
+          "script": "curl -s -m 5 \"http://example.com/index.php?pageid=1%20UNION%20SELECT%20username,password\" > /dev/null 2>&1"
+        },
+        {
+          "sid": "2006124",
+          "description": "detail.asp UNION SELECT SQL Injection",
+          "default_action": "reject",
+          "expected": "reject",
+          "script": "curl -s -m 5 \"http://example.com/detail.asp?ID=1%20UNION%20SELECT%20username,password\" > /dev/null 2>&1"
+        },
+        {
+          "sid": "2005082",
+          "description": "faq.php UNION SELECT SQL Injection",
+          "default_action": "reject",
+          "expected": "alert",
+          "script": "curl -s -m 5 \"http://example.com/faq.php?id=1%20UNION%20SELECT%20username,password\" > /dev/null 2>&1"
+        }
+      ]
     }
   },
   "legitimate_traffic": {

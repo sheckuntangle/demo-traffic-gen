@@ -444,11 +444,66 @@ const App = {
     },
 
     renderIdpsConfig(catConfig) {
-        const script = catConfig.script || "";
-        const lines = script.split("\n").length;
-        return `<h6>Test Script</h6>
-            <p class="text-muted small">Shell script executed to trigger IDS/IPS signatures. Lines starting with "Test " are parsed as individual test results.</p>
-            <textarea class="form-control form-control-sm font-monospace" id="idps-script" rows="${Math.min(30, Math.max(10, lines + 2))}" style="font-size:12px">${this.esc(script)}</textarea>`;
+        const sigs = catConfig.signatures || [];
+        let html = `<h6>Signatures</h6>
+            <p class="text-muted small">Each signature runs its script and checks the exit code. Block/reject expect the script to fail (firewall blocks traffic); alert expects it to succeed.</p>
+            <div id="idps-signatures">`;
+
+        for (let i = 0; i < sigs.length; i++) {
+            html += this._renderIdpsSignature(sigs[i], i);
+        }
+
+        html += `</div>
+            <button class="btn btn-sm btn-outline-light mb-3" onclick="App.addIdpsSignature()">+ Add Signature</button>`;
+        return html;
+    },
+
+    _renderIdpsSignature(sig, idx) {
+        const actionSelect = (field, val) => {
+            const opts = ["alert", "reject", "block"];
+            let html = `<select class="form-select form-select-sm" data-idps-field="${field}">`;
+            for (const o of opts) {
+                html += `<option value="${o}" ${val === o ? "selected" : ""}>${o}</option>`;
+            }
+            html += `</select>`;
+            return html;
+        };
+        return `<div class="card mb-2 idps-sig-card">
+            <div class="card-body p-2">
+                <div class="row g-2 mb-2">
+                    <div class="col-md-2">
+                        <label class="form-label small">SID</label>
+                        <input type="text" class="form-control form-control-sm" data-idps-field="sid" value="${this.esc(sig.sid || "")}">
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label small">Description</label>
+                        <input type="text" class="form-control form-control-sm" data-idps-field="description" value="${this.esc(sig.description || "")}">
+                    </div>
+                    <div class="col-md-2">
+                        <label class="form-label small">Default Action</label>
+                        ${actionSelect("default_action", sig.default_action || "alert")}
+                    </div>
+                    <div class="col-md-2">
+                        <label class="form-label small">Expected</label>
+                        ${actionSelect("expected", sig.expected || "block")}
+                    </div>
+                    <div class="col-md-2 d-flex align-items-end">
+                        <button class="btn btn-sm btn-outline-danger" onclick="this.closest('.idps-sig-card').remove()">Remove</button>
+                    </div>
+                </div>
+                <div>
+                    <label class="form-label small">Script</label>
+                    <textarea class="form-control form-control-sm font-monospace" data-idps-field="script" rows="2" style="font-size:12px">${this.esc(sig.script || "")}</textarea>
+                </div>
+            </div>
+        </div>`;
+    },
+
+    addIdpsSignature() {
+        const container = document.getElementById("idps-signatures");
+        const div = document.createElement("div");
+        div.innerHTML = this._renderIdpsSignature({}, container.children.length);
+        container.appendChild(div.firstElementChild);
     },
 
     _expectedSelect(val) {
@@ -506,7 +561,7 @@ const App = {
 
         const schema = CATEGORY_SCHEMAS[name];
         if (name === "idps") {
-            catConfig.script = document.getElementById("idps-script").value;
+            catConfig.signatures = this.readIdpsSignatures();
         } else if (name === "geo_ip") {
             for (const [country, data] of Object.entries(catConfig.countries || {})) {
                 const tableId = `table-geo_ip-countries-${country}-targets`;
@@ -544,6 +599,19 @@ const App = {
             if (hasValue) items.push(item);
         });
         return items;
+    },
+
+    readIdpsSignatures() {
+        const cards = document.querySelectorAll("#idps-signatures .idps-sig-card");
+        const sigs = [];
+        cards.forEach(card => {
+            const sig = {};
+            card.querySelectorAll("[data-idps-field]").forEach(el => {
+                sig[el.dataset.idpsField] = el.value.trim();
+            });
+            if (sig.sid || sig.script) sigs.push(sig);
+        });
+        return sigs;
     },
 
     renderLegitConfig() {
