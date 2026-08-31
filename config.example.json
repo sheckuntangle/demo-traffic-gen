@@ -240,8 +240,8 @@
       "_note": "IPs that BrightCloud classifies as malicious. Update by checking brightcloud.com/tools/url-ip-lookup.php or pulling from abuse.ch Feodo Tracker / Spamhaus DROP lists.",
       "targets": [
         {
-          "ip": "198.51.100.1",
-          "description": "PLACEHOLDER - verify with BrightCloud",
+          "ip": "209.141.55.26",
+          "description": "BrightCloud-flagged malicious IP",
           "expected": "block"
         }
       ]
