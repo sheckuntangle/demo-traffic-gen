@@ -1,0 +1,24 @@
+services:
+  controller:
+    build:
+      context: .
+      dockerfile: Dockerfile.controller
+    image: demo-generator-controller:latest
+    container_name: demo-generator-controller
+    network_mode: host
+    init: true
+    restart: unless-stopped
+    environment:
+      PYTHONUNBUFFERED: "1"
+    volumes:
+      # The application uses the host daemon to build worker images and manage
+      # macvlan networks/containers. Docker-socket access is host-root-equivalent.
+      - /var/run/docker.sock:/var/run/docker.sock
+      # Created by Compose if absent. It stores GUI-edited config and all logs.
+      - ./data:/data
+    healthcheck:
+      test: ["CMD-SHELL", "curl --fail --silent http://127.0.0.1:8080/api/config >/dev/null"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s

@@ -31,13 +31,67 @@ A single Ubuntu server runs behind the firewall on the DHCP subnet. In **local m
 ## Quick Start
 
 ```bash
-# Install everything (Ubuntu — one time, requires sudo)
+# Build and launch the self-contained Docker deployment
+docker compose up --build -d
+
+# Open the web GUI
+# http://<docker-host>:8080
+
+# Follow controller logs, then stop it when finished
+docker compose logs -f controller
+docker compose down
+```
+
+The controller runs with host networking so the UI can discover the Docker
+host's real network interfaces for macvlan configuration. Port 8080 therefore
+listens on all host interfaces; restrict it with the host firewall to trusted
+administrators.
+
+Runtime state lives in `./data/`: the first startup creates
+`data/config.json` from `config.example.json`, the web UI saves changes there,
+and logs are written to `data/logs/`. Keep this directory to preserve settings
+across `docker compose down` and container recreation.
+
+Docker client mode mounts `/var/run/docker.sock` into the controller so it can
+build worker images and create macvlan networks and traffic containers. Access
+to that socket is effectively host-root access; only run this deployment from a
+trusted checkout on a trusted host.
+
+### For Running Through Bastion Configured Test Beds
+
+For running through Bastion configured test beds - add this iptables rule to
+the bastion host. It forwards unused bastion TCP port `8080` to the Compose
+host at TCP port `8080`.
+
+The supplied NAT table does not use port `8080`; append this DNAT rule to its
+existing `CONSOLE` chain (replace the example with the Compose host's LAN IP):
+
+```bash
+GENERATOR_HOST_IP=192.168.0.200
+iptables -t nat -A CONSOLE -p tcp --dport 8080 -j DNAT --to-destination "${GENERATOR_HOST_IP}:8080"
+```
+
+Browse to `http://<bastion-ip>:8080` after the controller is running.
+
+The existing `POSTROUTING` MASQUERADE rules provide the return path. If the
+bastion's `FORWARD` policy or rules do not already allow this traffic, enable
+forwarding and add the matching allow rule:
+
+```bash
+sysctl -w net.ipv4.ip_forward=1
+iptables -C FORWARD -p tcp -d "${GENERATOR_HOST_IP}" --dport 8080 -j ACCEPT || iptables -A FORWARD -p tcp -d "${GENERATOR_HOST_IP}" --dport 8080 -j ACCEPT
+```
+
+Persist the rules using the bastion host's normal firewall-management method.
+
+### Legacy Native Installation
+
+The original Ubuntu-host workflow remains available when Docker is not the
+deployment target:
+
+```bash
 ./install.sh
-
-# Launch web GUI (default — opens at http://localhost:8080)
 ./run.sh
-
-# Or run headless (console output only, no GUI)
 ./run.sh --headless
 ```
 
@@ -67,14 +121,14 @@ The generator simulates multiple clients with different browser fingerprints (us
 
 For traffic to appear from different source IPs in firewall reports, use **Docker macvlan mode**. Each client runs in its own Docker container with a unique IP on the firewall's DHCP subnet. All traffic types (browser, DNS, ping, TCP, SSH) originate from that container's IP.
 
-Setup via the web GUI Configuration tab:
+Setup via the web GUI Configuration tab after the Compose controller is
+running:
 
 1. Configure the parent interface, subnet, and gateway in the **Docker Clients** card
 2. Add containers with names matching your client profiles and IPs from the subnet
-3. **Build Image** (one-time, takes a few minutes)
-4. **Create Network** to set up the macvlan
-5. **Start All** to launch containers
-6. Enable Docker mode and start the traffic generator
+3. Enable Docker client mode and start the traffic generator; the controller
+   builds the worker image (one time), creates the macvlan and management
+   networks, and starts the configured containers automatically
 
 Each container runs its own Chromium instance (~512 MB RAM per container).
 
@@ -148,9 +202,11 @@ These targets change over time — refresh periodically.
 ```
 config.json              # All targets and settings
 requirements.txt         # Python dependencies
-install.sh               # One-time Ubuntu setup (deps, Docker, venv, sudoers)
-run.sh                   # Launch wrapper (uses venv automatically)
-Dockerfile               # Docker worker container image
+compose.yaml             # Docker-only controller deployment
+Dockerfile.controller    # Web/headless controller image
+Dockerfile               # Dynamically spawned Docker worker image
+install.sh               # Legacy one-time Ubuntu host setup
+run.sh                   # Legacy native launch wrapper
 traffic_generator.py     # Legacy single-pass script (still works)
 demo_generator/          # Multi-client package
 ├── __main__.py          # CLI entry point (--web default)
