@@ -95,24 +95,11 @@ deployment target:
 ./run.sh --headless
 ```
 
-## What It Does
+## Expected Actions
 
-Generates traffic that triggers and populates reporting for these firewall services:
+See [ExpectedActions.md](ExpectedActions.md) for the full breakdown of expected firewall actions per category, including the policy config ([all-actions-test.json](all-actions-test.json)) these tests are designed for.
 
-| Category | What It Tests |
-|----------|---------------|
-| **App Control** | SSH connections (block), Facebook (reject), Gmail (alert) |
-| **DNS Filter** | mlb.com (block), nfl.com (reject), nba.com (alert) |
-| **Geo-IP** | France (block), Switzerland (reject), Sweden (alert) |
-| **Web Filter** | Marijuana/weedmaps (block), Shopping/amazon (reject), Sports/espn (alert) |
-| **Dynamic Blocklist** | wikipedia (block), OpenDNS 208.67.220.220 (reject), cnn (alert) — tied to external blocklist feeds |
-| **Security** | 9.9.9.9/Quad9 (block), 1.1.1.1/Cloudflare (reject), 94.140.14.14/AdGuard (accept) |
-| **IDPS** | Per-signature Suricata tests — 6 SIDs with configurable default/expected actions and individual curl scripts |
-| **IP Reputation** | BrightCloud-flagged malicious IPs — block/reject/alert, per-target Docker client IP selection |
-| **URL Reputation** | BrightCloud-flagged high-risk URLs — block/reject/alert, per-target Docker client IP selection |
-| **Legitimate Traffic** | High-volume normal browsing, DNS, and pings for realistic reporting |
-
-Each round interleaves blocked/alerted traffic with legitimate "allowed" traffic so the firewall dashboard shows a realistic mix.
+Each round interleaves blocked/alerted/rejected traffic with legitimate "allowed" traffic so the firewall dashboard shows a realistic mix.
 
 ## Multi-Client
 
