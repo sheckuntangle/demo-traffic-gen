@@ -265,42 +265,42 @@
           "description": "/etc/passwd Detected in URI",
           "default_action": "alert",
           "expected": "block",
-          "script": "curl -s \"http://example.com/etc/passwd\" > /dev/null 2>&1"
+          "script": "curl -s \"http://example.com/etc/passwd\" > /dev/null"
         },
         {
           "sid": "2033891",
           "description": "Observed Suspicious Request nc.exe in URI",
           "default_action": "alert",
           "expected": "reject",
-          "script": "curl -s \"http://example.com/nc.exe\" > /dev/null 2>&1"
+          "script": "curl -s \"http://example.com/nc.exe\" > /dev/null"
         },
         {
           "sid": "2029923",
           "description": "IP Check (ip.jsontest.com)",
           "default_action": "alert",
           "expected": "alert",
-          "script": "curl -s \"http://ip.jsontest.com/\" > /dev/null 2>&1"
+          "script": "curl -s \"http://ip.jsontest.com/\" > /dev/null"
         },
         {
           "sid": "2007337",
-          "description": "UNION SELECT SQL Injection",
+          "description": "ContentNow SQL Injection Attempt (UNION SELECT)",
           "default_action": "reject",
           "expected": "block",
-          "script": "curl -s -m 5 \"http://example.com/index.php?pageid=1%20UNION%20SELECT%20username,password\" > /dev/null 2>&1"
+          "script": "curl -v -m 5 \"http://example.com/index.php?pageid=1%20UNION%20SELECT%20username,password\" 2>/dev/null"
         },
         {
           "sid": "2006124",
-          "description": "detail.asp UNION SELECT SQL Injection",
+          "description": "Mxmania File Upload Manager (detail.asp ID UNION SELECT)",
           "default_action": "reject",
           "expected": "reject",
-          "script": "curl -s -m 5 \"http://example.com/detail.asp?ID=1%20UNION%20SELECT%20username,password\" > /dev/null 2>&1"
+          "script": "curl -v -m 5 \"http://example.com/detail.asp?ID=1%20UNION%20SELECT%20username,password\" 2>/dev/null"
         },
         {
           "sid": "2005082",
-          "description": "faq.php UNION SELECT SQL Injection",
+          "description": "ExoPHPDesk SQL Injection Attempt (faq.php id UNION SELECT)",
           "default_action": "reject",
           "expected": "alert",
-          "script": "curl -s -m 5 \"http://example.com/faq.php?id=1%20UNION%20SELECT%20username,password\" > /dev/null 2>&1"
+          "script": "curl -v -m 5 \"http://example.com/faq.php?id=1%20UNION%20SELECT%20username,password\" 2>/dev/null"
         }
       ]
     }
