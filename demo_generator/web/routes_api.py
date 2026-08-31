@@ -113,6 +113,59 @@ async def update_legitimate_config(request: Request):
     return {"status": "saved"}
 
 
+@router.post("/config/reset")
+async def reset_all_config(request: Request):
+    from ..config import load_defaults, DOCKER_DEFAULTS
+    manager = request.app.state.manager
+    defaults = load_defaults()
+    defaults["docker"] = dict(DOCKER_DEFAULTS)
+    manager.config.update(defaults)
+    manager._save_config()
+    return manager.config
+
+
+@router.post("/config/reset/generator")
+async def reset_generator_config(request: Request):
+    from ..config import load_defaults
+    manager = request.app.state.manager
+    defaults = load_defaults()
+    manager.config["generator"] = defaults.get("generator", {})
+    manager._save_config()
+    return manager.config["generator"]
+
+
+@router.post("/config/reset/docker")
+async def reset_docker_config(request: Request):
+    from ..config import DOCKER_DEFAULTS
+    manager = request.app.state.manager
+    manager.config["docker"] = dict(DOCKER_DEFAULTS)
+    manager._save_config()
+    return manager.config["docker"]
+
+
+@router.post("/config/reset/categories/{name}")
+async def reset_category_config(name: str, request: Request):
+    from ..config import load_defaults
+    manager = request.app.state.manager
+    defaults = load_defaults()
+    default_cats = defaults.get("categories", {})
+    if name not in default_cats:
+        raise HTTPException(404, f"No defaults for category: {name}")
+    manager.config["categories"][name] = default_cats[name]
+    manager._save_config()
+    return manager.config["categories"][name]
+
+
+@router.post("/config/reset/legitimate")
+async def reset_legitimate_config(request: Request):
+    from ..config import load_defaults
+    manager = request.app.state.manager
+    defaults = load_defaults()
+    manager.config["legitimate_traffic"] = defaults.get("legitimate_traffic", {})
+    manager._save_config()
+    return manager.config["legitimate_traffic"]
+
+
 @router.get("/categories")
 async def list_categories(request: Request):
     from ..categories import get_all_categories

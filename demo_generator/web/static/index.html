@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Firewall Demo Traffic Generator</title>
     <link href="/static/bootstrap.min.css" rel="stylesheet">
-    <link href="/static/style.css?v=11" rel="stylesheet">
+    <link href="/static/style.css?v=12" rel="stylesheet">
 </head>
 <body>
 
@@ -71,12 +71,18 @@
 
         <!-- Configuration Tab -->
         <div class="tab-pane" id="config-tab">
+            <div class="d-flex justify-content-end mb-3">
+                <button class="btn btn-outline-warning btn-sm" onclick="App.resetAll()">Reset All to Defaults</button>
+            </div>
             <!-- Generator Settings -->
             <div class="card mb-3">
                 <div class="card-header"><strong>Generator Settings</strong></div>
                 <div class="card-body">
                     <div class="row g-3" id="generator-settings"></div>
-                    <button class="btn btn-primary btn-sm mt-3" onclick="App.saveGenerator()">Save Generator Settings</button>
+                    <div class="d-flex gap-2 mt-3">
+                        <button class="btn btn-primary btn-sm" onclick="App.saveGenerator()">Save Generator Settings</button>
+                        <button class="btn btn-outline-warning btn-sm" onclick="App.resetSection('generator', 'Generator Settings')">Reset to Defaults</button>
+                    </div>
                 </div>
             </div>
 
@@ -117,7 +123,10 @@
                                 <input type="number" class="form-control form-control-sm" id="docker-client-count" value="3" min="1">
                             </div>
                         </div>
-                        <button class="btn btn-primary btn-sm" onclick="App.saveDockerConfig()">Save Docker Config</button>
+                        <div class="d-flex gap-2">
+                            <button class="btn btn-primary btn-sm" onclick="App.saveDockerConfig()">Save Docker Config</button>
+                            <button class="btn btn-outline-warning btn-sm" onclick="App.resetSection('docker', 'Docker Config')">Reset to Defaults</button>
+                        </div>
                         <div id="docker-container-status" class="mt-3"></div>
                     </div>
                 </div>
@@ -136,6 +145,6 @@
 </div>
 
 <script src="/static/bootstrap.bundle.min.js"></script>
-<script src="/static/app.js?v=11"></script>
+<script src="/static/app.js?v=12"></script>
 </body>
 </html>

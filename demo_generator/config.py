@@ -42,6 +42,12 @@ DOCKER_DEFAULTS = {
 }
 
 
+def load_defaults():
+    example = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "config.example.json")
+    with open(example, "r") as f:
+        return json.load(f)
+
+
 def load_config(config_path="config.json"):
     if not os.path.exists(config_path):
         import shutil

@@ -422,7 +422,10 @@ const App = {
                 }
             }
 
-            html += `<button class="btn btn-primary btn-sm mt-2" onclick="App.saveCategory('${name}')">Save</button>
+            html += `<div class="d-flex gap-2 mt-2">
+                        <button class="btn btn-primary btn-sm" onclick="App.saveCategory('${name}')">Save</button>
+                        <button class="btn btn-outline-warning btn-sm" onclick="App.resetCategory('${name}')">Reset to Defaults</button>
+                    </div>
                     </div>
                 </div>
             </div>`;
@@ -556,7 +559,10 @@ const App = {
         html += `<h6>Ping Targets</h6>`;
         html += this.renderTargetTable("legit", "ping_targets", ["name", "ip"], legit.ping_targets || []);
 
-        html += `<button class="btn btn-primary btn-sm" onclick="App.saveLegitimate()">Save Legitimate Traffic</button>`;
+        html += `<div class="d-flex gap-2">
+            <button class="btn btn-primary btn-sm" onclick="App.saveLegitimate()">Save Legitimate Traffic</button>
+            <button class="btn btn-outline-warning btn-sm" onclick="App.resetSection('legitimate', 'Legitimate Traffic')">Reset to Defaults</button>
+        </div>`;
         document.getElementById("legit-config").innerHTML = html;
     },
 
@@ -655,6 +661,44 @@ const App = {
         });
         this.config.docker = {...(this.config.docker || {}), ...data};
         this.showToast("Docker config saved");
+    },
+
+    // --- Reset to Defaults ---
+
+    async resetAll() {
+        if (!confirm("Reset ALL configuration to defaults? This cannot be undone.")) return;
+        const res = await fetch("/api/config/reset", {method: "POST"});
+        this.config = await res.json();
+        await this.loadConfig();
+        this.showToast("All settings reset to defaults");
+    },
+
+    async resetSection(section, label) {
+        if (!confirm(`Reset ${label} to defaults?`)) return;
+        const endpoint = section === "legitimate" ? "/api/config/reset/legitimate" : `/api/config/reset/${section}`;
+        const res = await fetch(endpoint, {method: "POST"});
+        const data = await res.json();
+        if (section === "generator") {
+            this.config.generator = data;
+            this.renderGeneratorSettings();
+        } else if (section === "docker") {
+            this.config.docker = data;
+            await this.loadDockerStatus();
+        } else if (section === "legitimate") {
+            this.config.legitimate_traffic = data;
+            this.renderLegitConfig();
+        }
+        this.showToast(`${label} reset to defaults`);
+    },
+
+    async resetCategory(name) {
+        const display = CATEGORY_DISPLAY[name] || name;
+        if (!confirm(`Reset ${display} to defaults?`)) return;
+        const res = await fetch(`/api/config/reset/categories/${name}`, {method: "POST"});
+        const data = await res.json();
+        this.config.categories[name] = data;
+        this.renderCategoryConfigs();
+        this.showToast(`${display} reset to defaults`);
     },
 
     // --- Utilities ---
