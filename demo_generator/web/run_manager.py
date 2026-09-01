@@ -40,10 +40,17 @@ class RunManager:
         dead = set()
         for ws in self.ws_clients:
             try:
-                asyncio.ensure_future(ws.send_json(message))
+                asyncio.ensure_future(self._safe_send(ws, message, dead))
             except Exception:
                 dead.add(ws)
         self.ws_clients -= dead
+
+    async def _safe_send(self, ws, message, dead):
+        try:
+            await asyncio.wait_for(ws.send_json(message), timeout=5)
+        except Exception:
+            dead.add(ws)
+            self.ws_clients.discard(ws)
 
     def get_status(self):
         running = self._run_task is not None and not self._run_task.done()

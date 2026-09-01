@@ -82,12 +82,15 @@ class ClientContext:
 
 
 class ClientPool:
+    BROWSER_RESTART_EVERY = 50
+
     def __init__(self, config):
         self._config = config
         self._browser = None
         self._clients = []
         self._playwright = None
         self._rounds_since_recycle = 0
+        self._total_recycles = 0
         self._recycle_interval = config["generator"].get("browser_recycle_rounds", 10)
 
     def _build_profiles(self):
@@ -138,8 +141,38 @@ class ClientPool:
         self._rounds_since_recycle += 1
         if self._rounds_since_recycle >= self._recycle_interval:
             self._rounds_since_recycle = 0
-            await self._close_contexts()
-            await self._create_contexts()
+            self._total_recycles += 1
+            if self._total_recycles % self.BROWSER_RESTART_EVERY == 0:
+                await self._restart_browser()
+            else:
+                await self._close_contexts()
+                await self._create_contexts()
+
+    async def _restart_browser(self):
+        await self._close_contexts()
+        if self._browser:
+            try:
+                await self._browser.close()
+            except Exception:
+                pass
+        try:
+            self._browser = await self._playwright.chromium.launch(
+                headless=True,
+                args=BROWSER_LAUNCH_ARGS,
+            )
+        except Exception:
+            from playwright.async_api import async_playwright
+            if self._playwright:
+                try:
+                    await self._playwright.stop()
+                except Exception:
+                    pass
+            self._playwright = await async_playwright().start()
+            self._browser = await self._playwright.chromium.launch(
+                headless=True,
+                args=BROWSER_LAUNCH_ARGS,
+            )
+        await self._create_contexts()
 
     async def _close_contexts(self):
         for client in self._clients:
