@@ -8,6 +8,8 @@ import shutil
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel
 
+from .run_manager import RunConflict
+
 logger = logging.getLogger("demo_generator.web.api")
 
 router = APIRouter()
@@ -22,11 +24,12 @@ class StartRequest(BaseModel):
 @router.post("/start")
 async def start(req: StartRequest, request: Request):
     manager = request.app.state.manager
-    if manager._engine and manager._engine.is_running:
-        raise HTTPException(409, "Engine is already running")
     if req.mode not in ("full", "triggers", "legit"):
         raise HTTPException(400, f"Invalid mode: {req.mode}")
-    await manager.start(req.mode)
+    try:
+        await manager.start(req.mode)
+    except RunConflict as e:
+        raise HTTPException(409, str(e))
     return {"status": "started", "mode": req.mode}
 
 
@@ -37,24 +40,26 @@ async def stop(request: Request):
     return {"status": "stopping"}
 
 
-@router.post("/run/{category_name}")
-async def run_single(category_name: str, request: Request):
-    manager = request.app.state.manager
-    try:
-        await manager.run_single(category_name)
-    except ValueError as e:
-        raise HTTPException(400, str(e))
-    except Exception as e:
-        manager.logger.info("ERROR", f"Single category run failed: {category_name}: {e}")
-        raise HTTPException(500, str(e))
-    return {"status": "completed", "category": category_name}
-
-
 @router.post("/run/stop")
 async def stop_single(request: Request):
     manager = request.app.state.manager
     await manager.stop_single()
     return {"status": "stopped"}
+
+
+@router.post("/run/{category_name}")
+async def run_single(category_name: str, request: Request):
+    manager = request.app.state.manager
+    try:
+        await manager.run_single(category_name)
+    except RunConflict as e:
+        raise HTTPException(409, str(e))
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+    except Exception as e:
+        manager.logger.info("ERROR", f"Single category run failed: {category_name}: {e}")
+        raise HTTPException(500, str(e))
+    return {"status": "started", "category": category_name}
 
 
 @router.get("/status")

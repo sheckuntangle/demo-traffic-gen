@@ -17,8 +17,11 @@ async def websocket_endpoint(websocket: WebSocket):
     logger.info(f"WebSocket connected ({len(manager.ws_clients)} clients)")
 
     try:
-        await websocket.send_json({"type": "status", "data": manager.get_status()})
-        await websocket.send_json({"type": "stats", "data": manager.get_stats()})
+        await websocket.send_json({"type": "snapshot", "data": {
+            "status": manager.get_status(),
+            "stats": manager.get_stats(),
+            "logs": manager.get_log_history(),
+        }})
 
         while True:
             await websocket.receive_text()

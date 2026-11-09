@@ -4,6 +4,9 @@ import asyncio
 import json
 import os
 import tempfile
+import logging
+from collections import deque
+from logging.handlers import RotatingFileHandler
 from datetime import datetime
 
 from ..config import load_config
@@ -11,6 +14,10 @@ from ..engine import Engine, RunMode
 from ..logger import Logger
 from ..stats import Stats
 from ..clients import ClientPool
+
+
+class RunConflict(RuntimeError):
+    """Another test owns the shared runner."""
 
 
 class RunManager:
@@ -30,10 +37,32 @@ class RunManager:
         self._mode = None
         self._start_time = None
         self.ws_clients = set()
+        self._active_category = None
+        self._phase = "idle"
+        self._history = deque(maxlen=1000)
+        history_path = os.path.join(config["generator"].get("log_dir", "./logs"), "web_history.jsonl")
+        for path in (history_path + ".1", history_path):
+            try:
+                with open(path) as history:
+                    for line in history:
+                        try:
+                            entry = json.loads(line)
+                            if isinstance(entry, dict):
+                                self._history.append(entry)
+                        except ValueError:
+                            pass
+            except FileNotFoundError:
+                pass
+        self._history_handler = RotatingFileHandler(
+            history_path, maxBytes=10 * 1024 * 1024, backupCount=1)
+        self._history_handler.setFormatter(logging.Formatter("%(message)s"))
 
         self.logger.subscribe(self._on_log_entry)
 
     def _on_log_entry(self, entry):
+        self._history.append(entry)
+        self._history_handler.emit(logging.LogRecord(
+            "web_history", logging.INFO, "", 0, json.dumps(entry), (), None))
         self.broadcast({"type": "log", "data": entry})
 
     def broadcast(self, message):
@@ -53,18 +82,35 @@ class RunManager:
             self.ws_clients.discard(ws)
 
     def get_status(self):
-        running = self._run_task is not None and not self._run_task.done()
-        elapsed = 0
-        if self._start_time and running:
-            elapsed = int((datetime.now() - self._start_time).total_seconds())
+        running = self._phase != "idle"
+        elapsed = int((datetime.now() - self._start_time).total_seconds()) if running and self._start_time else 0
         return {
             "running": running,
+            "phase": self._phase,
+            "category": self._active_category,
             "mode": self._mode.value if self._mode else None,
             "round": self._engine.round_num if self._engine else 0,
             "elapsed_seconds": elapsed,
             "start_time": self._start_time.isoformat() if self._start_time else None,
             "log_file": self.logger.log_filename,
         }
+
+    def get_log_history(self):
+        return list(self._history)
+
+    def _publish_status(self):
+        self.broadcast({"type": "status", "data": self.get_status()})
+
+    def _reserve(self, mode=None, category=None):
+        # No await between checking and reserving: concurrent HTTP requests cannot overlap.
+        if self._phase != "idle":
+            raise RunConflict("A test is already in progress. Wait for it to complete or stop it first.")
+        self._mode = mode
+        self._active_category = category
+        self._phase = "starting"
+        self._start_time = datetime.now()
+        self._engine = None
+        self._publish_status()
 
     def get_stats(self):
         return self.stats.get_cumulative()
@@ -79,74 +125,75 @@ class RunManager:
         return self._pool
 
     async def start(self, mode="full"):
-        if self._engine and self._engine.is_running:
-            raise RuntimeError("Engine is already running")
+        self._reserve(mode=RunMode(mode))
+        self._run_task = asyncio.create_task(self._execute_run())
 
-        self._mode = RunMode(mode)
-        pool = await self._get_active_pool()
-        self._engine = Engine(self.config, self.logger, self.stats, pool=pool)
-
-        self._engine.on("on_round_start", lambda **kw: self.broadcast({
-            "type": "round_start", "data": kw
-        }))
-        self._engine.on("on_round_complete", lambda **kw: self.broadcast({
-            "type": "round_complete",
-            "data": {"round_num": kw.get("round_num"), "summary": kw.get("summary")},
-        }))
-
-        self._start_time = datetime.now()
-        self._run_task = asyncio.create_task(self._run_engine())
-        self.broadcast({"type": "status", "data": self.get_status()})
-
-    async def _run_engine(self):
-        try:
-            await self._engine.start(mode=self._mode)
-        except asyncio.CancelledError:
-            pass
-        except Exception as e:
-            self.logger.info("SYSTEM", f"Engine error: {e}")
-        finally:
-            self.broadcast({"type": "status", "data": self.get_status()})
-
-    async def stop(self):
-        if self._run_task and not self._run_task.done():
-            if self._engine:
-                self._engine.request_stop()
-            self._run_task.cancel()
-            try:
-                await asyncio.wait_for(self._run_task, timeout=10)
-            except (asyncio.TimeoutError, asyncio.CancelledError):
-                pass
-        self._run_task = None
-        self.broadcast({"type": "status", "data": self.get_status()})
-        if self._docker_pool and self._docker_pool.is_started:
-            self.logger.info("SYSTEM", "Stopping Docker containers...")
-            await self._docker_pool.cleanup()
-
-    async def run_single(self, category_name):
+    async def _execute_run(self, category=None):
         try:
             pool = await self._get_active_pool()
-            engine = Engine(self.config, self.logger, self.stats, pool=pool)
-            self._single_run_task = asyncio.create_task(
-                engine.run_single_category(category_name)
-            )
-            await self._single_run_task
+            self._engine = Engine(self.config, self.logger, self.stats, pool=pool)
+            self._engine.on("on_round_start", lambda **kw: self.broadcast({
+                "type": "round_start", "data": kw
+            }))
+            self._engine.on("on_round_complete", lambda **kw: self.broadcast({
+                "type": "round_complete", "data": kw
+            }))
+            self._engine.on("on_test_complete", lambda **kw: self.broadcast({
+                "type": "stats", "data": self.get_stats()
+            }))
+            self._phase = "running"
+            self._publish_status()
+            if category:
+                await self._engine.run_single_category(category)
+            else:
+                await self._engine.start(mode=self._mode)
         except asyncio.CancelledError:
-            self.logger.info("SYSTEM", f"Single run cancelled: {category_name}")
+            self.logger.info("SYSTEM", "Test stopped.")
         except Exception as e:
-            self.logger.info("ERROR", f"Single run error ({category_name}): {type(e).__name__}: {e}")
-            raise
+            self.logger.info("ERROR", f"Test error: {type(e).__name__}: {e}")
         finally:
-            self._single_run_task = None
+            self._phase = "stopping"
+            self._publish_status()
+            try:
+                if self._docker_pool:
+                    await self._docker_pool.cleanup()
+            finally:
+                self._phase = "idle"
+                self._active_category = None
+                self.broadcast({"type": "stats", "data": self.get_stats()})
+                self._publish_status()
+
+    async def stop(self):
+        task = next((t for t in (self._single_run_task, self._run_task)
+                     if t is not None and not t.done()), None)
+        if task and not task.done():
+            if self._phase == "stopping":
+                await asyncio.shield(task)
+                return
+            # Let a newly created task enter its try/finally before cancelling it.
+            await asyncio.sleep(0)
+            if task.done():
+                return
+            if self._phase == "stopping":
+                await asyncio.shield(task)
+                return
+            self._phase = "stopping"
+            self._publish_status()
+            if self._engine:
+                self._engine.request_stop()
+            task.cancel()
+            await task
+
+    async def run_single(self, category_name):
+        from ..categories import get_category
+        if get_category(category_name) is None:
+            raise ValueError(f"Unknown category: {category_name}")
+        self._reserve(category=category_name)
+        self._single_run_task = asyncio.create_task(self._execute_run(category_name))
 
     async def stop_single(self):
-        if self._single_run_task and not self._single_run_task.done():
-            self._single_run_task.cancel()
-            try:
-                await asyncio.wait_for(self._single_run_task, timeout=5)
-            except (asyncio.TimeoutError, asyncio.CancelledError):
-                pass
-            self._single_run_task = None
+        if self._active_category:
+            await self.stop()
 
     def update_config(self, section, key, data):
         if section == "generator":
@@ -192,3 +239,4 @@ class RunManager:
         if self._docker_pool:
             await self._docker_pool.cleanup()
         self.logger.close()
+        self._history_handler.close()

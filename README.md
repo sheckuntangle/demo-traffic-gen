@@ -159,6 +159,7 @@ IP aliasing adds secondary addresses to the host interface. This only affects `p
 The web interface at `http://localhost:8080` provides:
 
 - **Dashboard**: Start/Stop controls with three run modes (Full Run, Triggers Only, Legitimate Only), per-category stats cards with "Run Now" buttons, and a live log stream
+- **Shared activity**: Every browser receives the active run, current statistics, and the latest 1,000 log entries on connection or reconnection. Recent logs are saved in `web_history.jsonl` in the configured log directory and restored after controller restarts. Only one run (including a single-category test) can execute at a time; controls remain locked through startup and cleanup. “Clear View” clears only the current browser’s display.
 - **Configuration**: Generator settings, Docker client config, per-category targets (add/remove IPs, URLs, domains, IDPS signatures), and legitimate traffic pools — all saved to config.json. Each section has a "Reset to Defaults" button, plus a global reset at the top of the page
 - **Run Modes**:
   - **Full Run**: Continuous legitimate traffic with periodic trigger rounds — ideal for overnight demos

@@ -45,6 +45,7 @@ const App = {
     config: {},
     stats: {},
     running: false,
+    status: {running: false},
     startTime: null,
     elapsedInterval: null,
     logCount: 0,
@@ -79,7 +80,13 @@ const App = {
     },
 
     handleMessage(msg) {
-        if (msg.type === "log") this.appendLog(msg.data);
+        if (msg.type === "snapshot") {
+            this.clearLog();
+            for (const entry of msg.data.logs) this.appendLog(entry);
+            this.updateStatus(msg.data.status);
+            this.updateStats(msg.data.stats);
+        }
+        else if (msg.type === "log") this.appendLog(msg.data);
         else if (msg.type === "status") this.updateStatus(msg.data);
         else if (msg.type === "stats") this.updateStats(msg.data);
         else if (msg.type === "round_start") this.updateRound(msg.data.round_num);
@@ -91,62 +98,53 @@ const App = {
 
     // --- Controls ---
 
-    async start() {
-        const mode = document.getElementById("mode-select").value;
-        await fetch("/api/start", {
-            method: "POST",
-            headers: {"Content-Type": "application/json"},
-            body: JSON.stringify({mode}),
-        });
-    },
-
-    async stop() {
-        await fetch("/api/stop", {method: "POST"});
-        document.getElementById("start-btn").disabled = false;
-        document.getElementById("stop-btn").disabled = true;
-        document.getElementById("mode-select").disabled = false;
-    },
-
-    async runCategory(name) {
-        const runBtn = document.querySelector(`[data-run="${name}"]`);
-        const stopBtn = document.querySelector(`[data-stop="${name}"]`);
-        if (runBtn) { runBtn.style.display = "none"; }
-        if (stopBtn) { stopBtn.style.display = "inline-block"; }
+    async controlRequest(url, body) {
         try {
-            const res = await fetch(`/api/run/${name}`, {method: "POST"});
+            const res = await fetch(url, {
+                method: "POST",
+                headers: {"Content-Type": "application/json"},
+                ...(body ? {body: JSON.stringify(body)} : {}),
+            });
             if (!res.ok) {
                 const err = await res.json().catch(() => ({}));
                 this.showToast(`Error: ${err.detail || res.statusText}`);
             }
-            this.fetchStats();
         } catch (e) {
             this.showToast(`Network error: ${e.message}`);
-        } finally {
-            if (runBtn) { runBtn.style.display = "inline-block"; }
-            if (stopBtn) { stopBtn.style.display = "none"; }
         }
     },
 
+    async start() {
+        await this.controlRequest("/api/start", {mode: document.getElementById("mode-select").value});
+    },
+
+    async stop() {
+        await this.controlRequest("/api/stop");
+    },
+
+    async runCategory(name) {
+        await this.controlRequest(`/api/run/${name}`);
+    },
+
     async stopCategory(name) {
-        await fetch("/api/run/stop", {method: "POST"});
-        const runBtn = document.querySelector(`[data-run="${name}"]`);
-        const stopBtn = document.querySelector(`[data-stop="${name}"]`);
-        if (runBtn) { runBtn.style.display = "inline-block"; }
-        if (stopBtn) { stopBtn.style.display = "none"; }
+        await this.controlRequest("/api/run/stop");
     },
 
     // --- Status ---
 
     updateStatus(data) {
+        this.status = data;
         this.running = data.running;
         this.startTime = data.start_time ? new Date(data.start_time) : null;
 
         const badge = document.getElementById("status-badge");
-        badge.textContent = data.running ? "Running" : "Stopped";
+        badge.textContent = data.running ? ({starting: "Starting", stopping: "Stopping"}[data.phase] || "Running") : "Stopped";
         badge.className = "badge status-badge " + (data.running ? "status-running" : "status-stopped");
 
         const modeInfo = document.getElementById("mode-info");
-        if (data.running && data.mode) {
+        if (data.running && data.category) {
+            modeInfo.textContent = "Test: " + (CATEGORY_DISPLAY[data.category] || data.category);
+        } else if (data.running && data.mode) {
             const labels = {full: "Full Run", triggers: "Triggers Only", legit: "Legitimate Only"};
             modeInfo.textContent = "Mode: " + (labels[data.mode] || data.mode);
         } else {
@@ -157,7 +155,21 @@ const App = {
         document.getElementById("stop-btn").disabled = !data.running;
         document.getElementById("mode-select").disabled = data.running;
 
-        if (data.round) this.updateRound(data.round);
+        this.updateRunControls();
+        this.updateRound(data.round || 0);
+    },
+
+    updateRunControls() {
+        const data = this.status;
+        document.querySelectorAll("[data-run]").forEach(btn => {
+            btn.disabled = !!data.running;
+            btn.style.display = data.running && data.category === btn.dataset.run ? "none" : "inline-block";
+        });
+        document.querySelectorAll("[data-stop]").forEach(btn => {
+            btn.style.display = data.running && data.category === btn.dataset.stop ? "inline-block" : "none";
+            btn.disabled = data.phase === "stopping";
+        });
+        document.getElementById("stop-btn").disabled = !data.running || data.phase === "stopping";
     },
 
     updateRound(num) {
@@ -206,7 +218,6 @@ const App = {
             this.logCount++;
         }
 
-        this.logCount++;
         while (this.logCount > MAX_LOG_LINES) {
             panel.removeChild(panel.firstChild);
             this.logCount--;
@@ -284,6 +295,7 @@ const App = {
             </div></div>`;
         }
         grid.innerHTML = html;
+        this.updateRunControls();
     },
 
     // --- Config ---
