@@ -230,7 +230,7 @@ class RunManager:
     def get_docker_pool(self):
         if self._docker_pool is None:
             from ..docker_clients import DockerClientPool
-            self._docker_pool = DockerClientPool(self.config)
+            self._docker_pool = DockerClientPool(self.config, progress=lambda message: self.logger.info("DOCKER", message))
         return self._docker_pool
 
     async def cleanup(self):

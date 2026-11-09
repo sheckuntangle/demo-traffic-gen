@@ -3,6 +3,7 @@
 import asyncio
 import logging
 import random
+import time
 from dataclasses import dataclass
 from typing import Optional
 
@@ -28,6 +29,7 @@ class DockerClient:
     container_name: str
     macvlan_ip: str
     mgmt_ip: str
+    last_health_error: str = ""
 
     @property
     def base_url(self):
@@ -57,15 +59,18 @@ class DockerClient:
         try:
             async with aiohttp.ClientSession() as session:
                 async with session.get(f"{self.base_url}/health", timeout=aiohttp.ClientTimeout(total=5)) as resp:
+                    self.last_health_error = "" if resp.status == 200 else f"HTTP {resp.status}"
                     return resp.status == 200
-        except Exception:
+        except Exception as e:
+            self.last_health_error = f"{type(e).__name__}: {e}"
             return False
 
 
 class DockerNetworkManager:
-    def __init__(self, docker_client, config):
+    def __init__(self, docker_client, config, progress=None):
         self._docker = docker_client
         self._config = config
+        self._progress = progress or logger.info
 
     def get_macvlan_network(self):
         network_name = self._config["docker"].get("network_name", "demogen-macvlan")
@@ -103,7 +108,7 @@ class DockerNetworkManager:
             except Exception:
                 pass
             if existing_subnet != subnet:
-                logger.info(f"Macvlan subnet changed ({existing_subnet} -> {subnet}), recreating network")
+                self._progress(f"Macvlan subnet changed ({existing_subnet} -> {subnet}), recreating network")
                 macvlan.remove()
                 macvlan = None
 
@@ -117,12 +122,12 @@ class DockerNetworkManager:
                 options={"parent": parent_iface},
                 ipam=ipam_config,
             )
-            logger.info(f"Created macvlan network '{network_name}' on {parent_iface} ({subnet})")
+            self._progress(f"Created macvlan network '{network_name}' on {parent_iface} ({subnet})")
 
         mgmt = self.get_mgmt_network()
         if not mgmt:
             mgmt = self._docker.networks.create(MGMT_NETWORK_NAME, driver="bridge")
-            logger.info(f"Created management bridge network '{MGMT_NETWORK_NAME}'")
+            self._progress(f"Created management bridge network '{MGMT_NETWORK_NAME}'")
 
         return macvlan, mgmt
 
@@ -130,22 +135,53 @@ class DockerNetworkManager:
         macvlan = self.get_macvlan_network()
         if macvlan:
             macvlan.remove()
-            logger.info("Removed macvlan network")
+            self._progress("Removed macvlan network")
 
         mgmt = self.get_mgmt_network()
         if mgmt:
             mgmt.remove()
-            logger.info("Removed management network")
+            self._progress("Removed management network")
 
 
 class DockerClientPool:
-    def __init__(self, config):
+    def __init__(self, config, progress=None):
         self._config = config
         self._clients = []
+        self._containers = []
+        self._progress = progress
+        self._loop = None
         self._docker = None
         self._network_mgr = None
         self._rounds_since_recycle = 0
         self._recycle_interval = config["generator"].get("browser_recycle_rounds", 10)
+
+    def _log(self, message):
+        logger.info(message)
+        if self._progress and self._loop:
+            self._loop.call_soon_threadsafe(self._progress, message)
+
+    async def _docker_call(self, label, function, *args, **kwargs):
+        self._log(label)
+        started = time.monotonic()
+        task = asyncio.create_task(asyncio.to_thread(function, *args, **kwargs))
+        try:
+            while True:
+                done, _ = await asyncio.wait({task}, timeout=10)
+                if done:
+                    result = task.result()
+                    self._log(f"{label} — done ({time.monotonic() - started:.1f}s)")
+                    return result
+                self._log(f"{label} — still working ({time.monotonic() - started:.0f}s)")
+        except asyncio.CancelledError:
+            # Docker SDK calls cannot be cancelled mid-request. Finish before cleanup.
+            self._log(f"Stopping: waiting for Docker operation to finish: {label}")
+            try:
+                await task
+            finally:
+                raise
+        except Exception as e:
+            self._log(f"ERROR: {label} failed: {type(e).__name__}: {e}")
+            raise
 
     @property
     def is_started(self):
@@ -154,8 +190,8 @@ class DockerClientPool:
     def _init_docker(self):
         if self._docker is None:
             import docker
-            self._docker = docker.from_env()
-            self._network_mgr = DockerNetworkManager(self._docker, self._config)
+            self._docker = docker.from_env(timeout=60)
+            self._network_mgr = DockerNetworkManager(self._docker, self._config, self._log)
 
     @staticmethod
     def _generate_ips(start_ip, count):
@@ -167,7 +203,8 @@ class DockerClientPool:
     async def start(self):
         if self.is_started:
             return
-        self._init_docker()
+        self._loop = asyncio.get_running_loop()
+        await self._docker_call("Connecting to Docker daemon", self._init_docker)
 
         docker_conf = self._config["docker"]
         client_count = docker_conf.get("client_count", 3)
@@ -179,16 +216,18 @@ class DockerClientPool:
             raise ValueError("Docker client_count must be >= 1")
 
         image_name = docker_conf.get("image_name", "demo-generator-worker")
-        if not self.image_exists():
+        if not await self._docker_call(f"Checking worker image {image_name}", self.image_exists):
             import os
             project_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-            self.build_image(project_dir)
+            await self._docker_call(f"Building worker image {image_name} (first build may take several minutes)", self.build_image, project_dir)
 
-        macvlan, mgmt = self._network_mgr.create_networks()
+        self._log(f"Network settings: parent={docker_conf.get('parent_interface')}, "
+                  f"subnet={docker_conf.get('subnet')}, gateway={docker_conf.get('gateway')}")
+        macvlan, mgmt = await self._docker_call("Preparing macvlan and management networks", self._network_mgr.create_networks)
 
         ips = self._generate_ips(start_ip, client_count)
 
-        await asyncio.to_thread(self._remove_stale_containers)
+        await self._docker_call("Removing stale traffic containers", self._remove_stale_containers)
 
         tasks = [
             self._start_container(ip, image_name, macvlan, mgmt)
@@ -197,19 +236,21 @@ class DockerClientPool:
         results = await asyncio.gather(*tasks, return_exceptions=True)
         for r in results:
             if isinstance(r, Exception):
-                logger.error(f"Failed to start container: {r}")
+                self._log(f"ERROR: Failed to start container: {type(r).__name__}: {r}")
             elif r is not None:
                 self._clients.append(r)
 
-        logger.info(f"Started {len(self._clients)} Docker client(s)")
+        self._log(f"Docker startup: {len(self._clients)}/{client_count} clients ready")
+        if len(self._clients) != client_count:
+            raise RuntimeError("Docker startup incomplete; see container errors above")
 
     def _remove_stale_containers(self):
         for c in self._docker.containers.list(all=True, filters={"name": CONTAINER_PREFIX}):
             try:
                 c.remove(force=True)
-                logger.info(f"Removed stale container '{c.name}'")
+                self._log(f"Removed stale container '{c.name}'")
             except Exception as e:
-                logger.warning(f"Could not remove '{c.name}': {e}")
+                self._log(f"WARNING: Could not remove '{c.name}': {e}")
 
     async def _start_container(self, ip, image_name, macvlan, mgmt):
         ip_slug = ip.replace(".", "-")
@@ -230,8 +271,14 @@ class DockerClientPool:
 
         network_name = self._config["docker"].get("network_name", "demogen-macvlan")
 
-        container = await asyncio.to_thread(
-            self._docker.containers.run,
+        def create_container(*args, **kwargs):
+            container = self._docker.containers.run(*args, **kwargs)
+            # Track immediately, even if cancellation arrives during the SDK call.
+            self._containers.append(container)
+            return container
+
+        container = await self._docker_call(
+            f"Creating container {container_name} for {ip}", create_container,
             image_name,
             name=container_name,
             environment=env,
@@ -241,9 +288,9 @@ class DockerClientPool:
             shm_size="256m",
         )
 
-        await asyncio.to_thread(macvlan.disconnect, container)
-        await asyncio.to_thread(macvlan.connect, container, ipv4_address=ip)
-        await asyncio.to_thread(mgmt.connect, container)
+        await self._docker_call(f"Configuring {ip}: disconnecting temporary macvlan address", macvlan.disconnect, container)
+        await self._docker_call(f"Configuring {ip}: assigning macvlan IP", macvlan.connect, container, ipv4_address=ip)
+        await self._docker_call(f"Configuring {ip}: attaching management network", mgmt.connect, container)
 
         await asyncio.to_thread(container.reload)
         mgmt_ip = container.attrs["NetworkSettings"]["Networks"][MGMT_NETWORK_NAME]["IPAddress"]
@@ -266,15 +313,38 @@ class DockerClientPool:
         )
 
         await self._wait_for_health(client)
-        logger.info(f"Container {ip} ready (mgmt={mgmt_ip})")
+        self._log(f"Container {ip} ready (mgmt={mgmt_ip})")
         return client
 
     async def _wait_for_health(self, client, timeout=60):
-        for _ in range(timeout * 2):
-            if await client.health_check():
+        started = time.monotonic()
+        deadline = started + timeout
+        next_log = started
+        self._log(f"Waiting for {client.container_name} worker at {client.base_url}/health (timeout {timeout}s)")
+        while time.monotonic() < deadline:
+            remaining = deadline - time.monotonic()
+            try:
+                healthy = await asyncio.wait_for(client.health_check(), timeout=remaining)
+            except asyncio.TimeoutError:
+                healthy = False
+            if healthy:
+                self._log(f"Worker {client.macvlan_ip} healthy after {time.monotonic() - started:.1f}s")
                 return
-            await asyncio.sleep(0.5)
-        raise TimeoutError(f"Container '{client.container_name}' did not become healthy within {timeout}s")
+            now = time.monotonic()
+            if now >= next_log:
+                self._log(f"Worker {client.macvlan_ip} not ready yet ({now - started:.0f}s/{timeout}s): "
+                          f"{getattr(client, 'last_health_error', '') or 'health endpoint not responding'}")
+                next_log = now + 10
+            await asyncio.sleep(min(0.5, max(0, deadline - time.monotonic())))
+        try:
+            container = await asyncio.to_thread(self._docker.containers.get, client.container_id)
+            await asyncio.to_thread(container.reload)
+            self._log(f"ERROR: {client.container_name} state: {container.attrs.get('State', {})}")
+            output = await asyncio.to_thread(container.logs, tail=30)
+            self._log(f"Worker log tail ({client.container_name}):\n{output.decode(errors='replace')}")
+        except Exception as e:
+            self._log(f"Could not read worker diagnostics: {e}")
+        raise TimeoutError(f"Container '{client.container_name}' did not become healthy within {timeout}s; check worker logs and management network connectivity")
 
     def get_clients(self):
         return list(self._clients)
@@ -285,17 +355,15 @@ class DockerClientPool:
             self._rounds_since_recycle = 0
             tasks = [c.recycle() for c in self._clients]
             await asyncio.gather(*tasks, return_exceptions=True)
-            logger.info("Recycled all Docker client browser contexts")
+            self._log("Recycled all Docker client browser contexts")
 
     async def cleanup(self):
-        self._init_docker()
-        for client in self._clients:
+        for container in self._containers:
             try:
-                container = self._docker.containers.get(client.container_id)
-                container.remove(force=True)
-                logger.info(f"Removed container '{client.container_name}'")
+                await self._docker_call(f"Removing container {container.name}", container.remove, force=True)
             except Exception as e:
-                logger.error(f"Failed to remove '{client.container_name}': {e}")
+                self._log(f"ERROR: Failed to remove '{container.name}': {e}")
+        self._containers = []
         self._clients = []
 
     def get_status(self):
@@ -318,23 +386,27 @@ class DockerClientPool:
         return status
 
     def image_exists(self):
+        from docker.errors import ImageNotFound
         self._init_docker()
         image_name = self._config["docker"].get("image_name", "demo-generator-worker")
         try:
             self._docker.images.get(image_name)
             return True
-        except Exception:
+        except ImageNotFound:
             return False
 
     def build_image(self, path="."):
         self._init_docker()
         image_name = self._config["docker"].get("image_name", "demo-generator-worker")
-        logger.info(f"Building Docker image '{image_name}'...")
-        image, build_log = self._docker.images.build(path=path, tag=image_name, rm=True)
-        for chunk in build_log:
-            if "stream" in chunk:
-                line = chunk["stream"].strip()
-                if line:
-                    logger.info(f"  {line}")
-        logger.info(f"Image '{image_name}' built successfully")
-        return image
+        self._log(f"Building Docker image '{image_name}'...")
+        # Low-level streaming API emits output while the build is running.
+        for chunk in self._docker.api.build(path=path, tag=image_name, rm=True, decode=True):
+            if chunk.get("error"):
+                raise RuntimeError(chunk["error"])
+            line = chunk.get("stream", "").strip()
+            if not line and chunk.get("status"):
+                line = " ".join(str(chunk.get(key, "")) for key in ("id", "status", "progress")).strip()
+            if line:
+                self._log(f"Build: {line}")
+        self._log(f"Image '{image_name}' built successfully")
+        return self._docker.images.get(image_name)

@@ -120,6 +120,8 @@ running:
 
 Each container runs its own Chromium instance (~512 MB RAM per container).
 
+The shared dashboard log shows Docker startup stages, live worker-image build output, network and container setup, and worker health checks. Long Docker operations report progress every 10 seconds. If a worker misses its 60-second health deadline, the log includes its container state and the last 30 lines of worker output. Startup fails if any configured client cannot become ready.
+
 ### IP Aliasing (legacy, ping-only)
 
 IP aliasing adds secondary addresses to the host interface. This only affects `ping` traffic — browser, DNS, TCP, and SSH still use the host's primary IP. Use Docker mode instead for full source IP diversity.
