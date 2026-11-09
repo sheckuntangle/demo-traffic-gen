@@ -20,6 +20,8 @@ logger = logging.getLogger("demo_generator.docker")
 MGMT_NETWORK_NAME = "demogen-mgmt"
 CONTAINER_PREFIX = "demogen-client-"
 WORKER_PORT = 8090
+WORKER_PLAYWRIGHT_VERSION = "1.62.0"
+WORKER_VERSION_LABEL = "org.demo-generator.playwright-version"
 
 
 @dataclass
@@ -390,7 +392,12 @@ class DockerClientPool:
         self._init_docker()
         image_name = self._config["docker"].get("image_name", "demo-generator-worker")
         try:
-            self._docker.images.get(image_name)
+            image = self._docker.images.get(image_name)
+            version = (image.labels or {}).get(WORKER_VERSION_LABEL)
+            if version != WORKER_PLAYWRIGHT_VERSION:
+                self._log(f"Worker image '{image_name}' is incompatible or predates version tracking "
+                          f"(Playwright label={version!r}, required={WORKER_PLAYWRIGHT_VERSION}); rebuilding")
+                return False
             return True
         except ImageNotFound:
             return False

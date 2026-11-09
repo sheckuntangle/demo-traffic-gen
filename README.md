@@ -118,7 +118,7 @@ running:
    builds the worker image (one time), creates the macvlan and management
    networks, and starts the configured containers automatically
 
-Each container runs its own Chromium instance (~512 MB RAM per container).
+Each container runs its own Chromium instance (~512 MB RAM per container). The Playwright package is pinned to the browser version bundled in both Docker images. The controller rebuilds cached worker images without the matching version label automatically. When updating Playwright, update `requirements.txt`, both Docker base images, the worker image label, and `WORKER_PLAYWRIGHT_VERSION` together.
 
 The shared dashboard log shows Docker startup stages, live worker-image build output, network and container setup, and worker health checks. Long Docker operations report progress every 10 seconds. If a worker misses its 60-second health deadline, the log includes its container state and the last 30 lines of worker output. Startup fails if any configured client cannot become ready.
 
