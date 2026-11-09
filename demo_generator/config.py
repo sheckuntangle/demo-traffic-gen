@@ -1,5 +1,6 @@
 """Configuration loading and validation."""
 
+import copy
 import json
 import os
 import sys
@@ -42,6 +43,13 @@ DOCKER_DEFAULTS = {
 }
 
 
+SCHEDULER_DEFAULTS = {
+    "enabled": False,
+    "scheduled_at": None,
+    "tests": {name: True for name in (*REQUIRED_CATEGORY_KEYS, "legitimate")},
+}
+
+
 def load_defaults():
     example = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "config.example.json")
     with open(example, "r") as f:
@@ -69,6 +77,8 @@ def load_config(config_path="config.json"):
     config.setdefault("client_profiles", [])
     config.setdefault("categories", {})
     config.setdefault("legitimate_traffic", {"dns_domains": [], "web_urls": [], "ping_targets": []})
+
+    config.setdefault("scheduler", copy.deepcopy(SCHEDULER_DEFAULTS))
 
     config.setdefault("docker", {})
     for key, default in DOCKER_DEFAULTS.items():

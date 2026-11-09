@@ -24,6 +24,7 @@ def create_app(config, config_path):
         logger.info("Starting web server...")
         manager = RunManager(config, config_path)
         app.state.manager = manager
+        manager.start_scheduler()
         logger.info(f"Config loaded from {config_path}")
         yield
         logger.info("Shutting down...")

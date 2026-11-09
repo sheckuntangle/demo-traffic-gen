@@ -81,6 +81,15 @@ async def get_config(request: Request):
     return manager.config
 
 
+@router.put("/config/scheduler")
+async def update_scheduler_config(request: Request):
+    manager = request.app.state.manager
+    try:
+        return manager.update_scheduler(await request.json())
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+
+
 @router.get("/config/categories/{name}")
 async def get_category_config(name: str, request: Request):
     manager = request.app.state.manager
@@ -126,6 +135,7 @@ async def reset_all_config(request: Request):
     defaults["docker"] = dict(DOCKER_DEFAULTS)
     manager.config.update(defaults)
     manager._save_config()
+    manager.broadcast({"type": "scheduler", "data": manager.config["scheduler"]})
     return manager.config
 
 

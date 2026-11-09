@@ -85,7 +85,9 @@ const App = {
             for (const entry of msg.data.logs) this.appendLog(entry);
             this.updateStatus(msg.data.status);
             this.updateStats(msg.data.stats);
+            this.receiveScheduler(msg.data.scheduler);
         }
+        else if (msg.type === "scheduler") this.receiveScheduler(msg.data);
         else if (msg.type === "log") this.appendLog(msg.data);
         else if (msg.type === "status") this.updateStatus(msg.data);
         else if (msg.type === "stats") this.updateStats(msg.data);
@@ -145,7 +147,7 @@ const App = {
         if (data.running && data.category) {
             modeInfo.textContent = "Test: " + (CATEGORY_DISPLAY[data.category] || data.category);
         } else if (data.running && data.mode) {
-            const labels = {full: "Full Run", triggers: "Triggers Only", legit: "Legitimate Only"};
+            const labels = {full: "Full Run", triggers: "Triggers Only", legit: "Legitimate Only", scheduled: "Scheduled Tests"};
             modeInfo.textContent = "Mode: " + (labels[data.mode] || data.mode);
         } else {
             modeInfo.textContent = "";
@@ -312,6 +314,7 @@ const App = {
             this.config = {generator: {}, categories: {}, client_profiles: [], legitimate_traffic: {}};
         }
         try { await this.loadNetworkInterfaces(); console.log("[loadConfig] interfaces OK"); } catch (e) { console.error("[loadConfig] interfaces error:", e); }
+        this.renderScheduler();
         try { this.renderGeneratorSettings(); console.log("[loadConfig] generator OK"); } catch (e) { console.error("[loadConfig] renderGeneratorSettings error:", e); }
         try { this.renderCategoryConfigs(); console.log("[loadConfig] categories OK"); } catch (e) { console.error("[loadConfig] renderCategoryConfigs error:", e); }
         try { this.renderLegitConfig(); console.log("[loadConfig] legit OK"); } catch (e) { console.error("[loadConfig] renderLegitConfig error:", e); }
@@ -321,6 +324,70 @@ const App = {
 
     async loadCategories() {
         await this.fetchStats();
+    },
+
+    receiveScheduler(schedule) {
+        if (!schedule) return;
+        this.config.scheduler = schedule;
+        this.renderScheduler();
+    },
+
+    localDateTime(iso) {
+        if (!iso) return "";
+        const date = new Date(iso);
+        const pad = value => String(value).padStart(2, "0");
+        return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+    },
+
+    renderScheduler() {
+        const schedule = this.config.scheduler || {enabled: false, tests: {}};
+        document.getElementById("scheduler-enabled").checked = !!schedule.enabled;
+        document.getElementById("scheduler-time").value = this.localDateTime(schedule.scheduled_at);
+        const zone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+        document.getElementById("scheduler-timezone").textContent = `Your local timezone: ${zone}. Everyone sees this time in their own timezone.`;
+        document.getElementById("scheduler-tests").innerHTML = Object.entries(CATEGORY_DISPLAY).map(([name, label]) =>
+            `<div class="col"><div class="form-check form-switch">
+                <input class="form-check-input" type="checkbox" role="switch" id="schedule-${name}" data-schedule-test="${name}" ${schedule.tests[name] ? "checked" : ""}>
+                <label class="form-check-label" for="schedule-${name}">${label}</label>
+            </div></div>`).join("");
+        const summary = document.getElementById("scheduler-summary");
+        summary.textContent = schedule.enabled && schedule.scheduled_at
+            ? `Scheduled for ${new Date(schedule.scheduled_at).toLocaleString()} (${zone})`
+            : schedule.last_run_at ? `Last dispatched: ${new Date(schedule.last_run_at).toLocaleString()}. Scheduler disabled.` : "Scheduler disabled.";
+        this.toggleScheduler();
+    },
+
+    toggleScheduler() {
+        document.getElementById("scheduler-fields").disabled = !document.getElementById("scheduler-enabled").checked;
+    },
+
+    async saveScheduler() {
+        const enabled = document.getElementById("scheduler-enabled").checked;
+        const value = document.getElementById("scheduler-time").value;
+        const existing = this.config.scheduler?.scheduled_at;
+        // Preserve the exact instant if an unchanged local time falls in a repeated DST hour.
+        const date = value ? new Date(existing && this.localDateTime(existing) === value ? existing : value) : null;
+        if (enabled && (!date || !Number.isFinite(date.getTime()) || date <= new Date())) {
+            this.showToast("Choose a future date and time");
+            return;
+        }
+        // Reject local times skipped by a daylight-saving transition.
+        if (date && this.localDateTime(date.toISOString()) !== value) {
+            this.showToast("That local time does not exist due to a clock change. Choose another time.");
+            return;
+        }
+        const tests = {};
+        document.querySelectorAll("[data-schedule-test]").forEach(input => { tests[input.dataset.scheduleTest] = input.checked; });
+        try {
+            const res = await fetch("/api/config/scheduler", {
+                method: "PUT", headers: {"Content-Type": "application/json"},
+                body: JSON.stringify({enabled, scheduled_at: date ? date.toISOString() : null, tests}),
+            });
+            const data = await res.json();
+            if (!res.ok) { this.showToast(data.detail || "Could not save scheduler"); return; }
+            this.receiveScheduler(data);
+            this.showToast("Scheduler saved");
+        } catch (e) { this.showToast(`Network error: ${e.message}`); }
     },
 
     renderGeneratorSettings() {

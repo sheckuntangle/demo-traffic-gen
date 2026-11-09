@@ -21,6 +21,7 @@ async def websocket_endpoint(websocket: WebSocket):
             "status": manager.get_status(),
             "stats": manager.get_stats(),
             "logs": manager.get_log_history(),
+            "scheduler": manager.config["scheduler"],
         }})
 
         while True:

@@ -549,5 +549,21 @@
         "ip": "208.67.220.220"
       }
     ]
+  },
+  "scheduler": {
+    "enabled": false,
+    "scheduled_at": null,
+    "tests": {
+      "app_control": true,
+      "dns_filter": true,
+      "geo_ip": true,
+      "web_filter": true,
+      "dynamic_blocklist": true,
+      "security": true,
+      "ip_reputation": true,
+      "url_reputation": true,
+      "idps": true,
+      "legitimate": true
+    }
   }
 }

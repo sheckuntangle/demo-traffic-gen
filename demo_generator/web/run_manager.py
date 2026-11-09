@@ -1,15 +1,16 @@
 """Singleton managing Engine lifecycle, config persistence, and WebSocket broadcasting."""
 
 import asyncio
+import copy
 import json
 import os
 import tempfile
 import logging
 from collections import deque
 from logging.handlers import RotatingFileHandler
-from datetime import datetime
+from datetime import datetime, timezone
 
-from ..config import load_config
+from ..config import SCHEDULER_DEFAULTS
 from ..engine import Engine, RunMode
 from ..logger import Logger
 from ..stats import Stats
@@ -23,6 +24,10 @@ class RunConflict(RuntimeError):
 class RunManager:
     def __init__(self, config, config_path):
         self.config = config
+        self.config.setdefault("scheduler", copy.deepcopy(SCHEDULER_DEFAULTS))
+        self._scheduler_task = None
+        self._scheduler_waiting = False
+        self._scheduled_tests = None
         self.config_path = config_path
         self.logger = Logger(
             log_dir=config["generator"].get("log_dir", "./logs"),
@@ -83,12 +88,12 @@ class RunManager:
 
     def get_status(self):
         running = self._phase != "idle"
-        elapsed = int((datetime.now() - self._start_time).total_seconds()) if running and self._start_time else 0
+        elapsed = int((datetime.now(timezone.utc) - self._start_time).total_seconds()) if running and self._start_time else 0
         return {
             "running": running,
             "phase": self._phase,
             "category": self._active_category,
-            "mode": self._mode.value if self._mode else None,
+            "mode": "scheduled" if self._scheduled_tests is not None else (self._mode.value if self._mode else None),
             "round": self._engine.round_num if self._engine else 0,
             "elapsed_seconds": elapsed,
             "start_time": self._start_time.isoformat() if self._start_time else None,
@@ -105,10 +110,11 @@ class RunManager:
         # No await between checking and reserving: concurrent HTTP requests cannot overlap.
         if self._phase != "idle":
             raise RunConflict("A test is already in progress. Wait for it to complete or stop it first.")
+        self._scheduled_tests = None
         self._mode = mode
         self._active_category = category
         self._phase = "starting"
-        self._start_time = datetime.now()
+        self._start_time = datetime.now(timezone.utc)
         self._engine = None
         self._publish_status()
 
@@ -128,7 +134,7 @@ class RunManager:
         self._reserve(mode=RunMode(mode))
         self._run_task = asyncio.create_task(self._execute_run())
 
-    async def _execute_run(self, category=None):
+    async def _execute_run(self, category=None, scheduled_tests=None):
         try:
             pool = await self._get_active_pool()
             self._engine = Engine(self.config, self.logger, self.stats, pool=pool)
@@ -143,7 +149,13 @@ class RunManager:
             }))
             self._phase = "running"
             self._publish_status()
-            if category:
+            if scheduled_tests is not None:
+                for name in scheduled_tests:
+                    self._active_category = name
+                    self._publish_status()
+                    await self._engine.run_single_category(name)
+                self.logger.info("SCHEDULER", "Scheduled tests completed.")
+            elif category:
                 await self._engine.run_single_category(category)
             else:
                 await self._engine.start(mode=self._mode)
@@ -160,6 +172,7 @@ class RunManager:
             finally:
                 self._phase = "idle"
                 self._active_category = None
+                self._scheduled_tests = None
                 self.broadcast({"type": "stats", "data": self.get_stats()})
                 self._publish_status()
 
@@ -194,6 +207,83 @@ class RunManager:
     async def stop_single(self):
         if self._active_category:
             await self.stop()
+
+    def start_scheduler(self):
+        self._scheduler_task = asyncio.create_task(self._scheduler_loop())
+
+    def update_scheduler(self, data):
+        if not isinstance(data, dict) or type(data.get("enabled")) is not bool:
+            raise ValueError("Scheduler enabled must be true or false")
+        tests = data.get("tests")
+        allowed = set(SCHEDULER_DEFAULTS["tests"])
+        if (not isinstance(tests, dict) or set(tests) - allowed
+                or any(type(value) is not bool for value in tests.values())):
+            raise ValueError("Scheduler tests must contain known tests with boolean switches")
+        scheduled_at = data.get("scheduled_at")
+        if scheduled_at:
+            try:
+                when = datetime.fromisoformat(scheduled_at.replace("Z", "+00:00"))
+                if when.tzinfo is None or when.utcoffset() is None:
+                    raise ValueError()
+            except (ValueError, TypeError, AttributeError):
+                raise ValueError("Scheduled time must include a timezone")
+            scheduled_at = when.astimezone(timezone.utc).isoformat()
+        if data["enabled"]:
+            if not scheduled_at or when <= datetime.now(timezone.utc):
+                raise ValueError("Choose a future date and time")
+            if not any(tests.values()):
+                raise ValueError("Select at least one test")
+        schedule = {"enabled": data["enabled"], "scheduled_at": scheduled_at,
+                    "tests": {name: tests.get(name, False) for name in SCHEDULER_DEFAULTS["tests"]}}
+        previous = self.config["scheduler"]
+        self.config["scheduler"] = schedule
+        try:
+            self._save_config()
+        except Exception:
+            self.config["scheduler"] = previous
+            raise
+        self._scheduler_waiting = False
+        self.broadcast({"type": "scheduler", "data": schedule})
+        self.logger.info("SCHEDULER", f"Scheduled tests for {scheduled_at}" if schedule["enabled"] else "Scheduler disabled.")
+        return schedule
+
+    async def _check_schedule(self, now=None):
+        schedule = self.config["scheduler"]
+        if not schedule.get("enabled"):
+            return
+        when = datetime.fromisoformat(schedule["scheduled_at"].replace("Z", "+00:00"))
+        if (now or datetime.now(timezone.utc)) < when:
+            return
+        if self._phase != "idle":
+            if not self._scheduler_waiting:
+                self.logger.info("SCHEDULER", "Scheduled time reached; waiting for the active test to finish.")
+                self._scheduler_waiting = True
+            return  # Wait for the active test; never overlap runs.
+        tests = [name for name in SCHEDULER_DEFAULTS["tests"] if schedule["tests"].get(name)]
+        # Persist consumption before dispatch so a controller restart cannot repeat it.
+        previous = copy.deepcopy(schedule)
+        schedule["enabled"] = False
+        schedule["last_run_at"] = datetime.now(timezone.utc).isoformat()
+        try:
+            self._save_config()
+        except Exception:
+            self.config["scheduler"] = previous
+            raise
+        self._scheduler_waiting = False
+        self._reserve()
+        self._scheduled_tests = tests
+        self.logger.info("SCHEDULER", f"Starting scheduled tests: {', '.join(tests)}")
+        self.broadcast({"type": "scheduler", "data": schedule})
+        self._publish_status()
+        self._run_task = asyncio.create_task(self._execute_run(scheduled_tests=tests))
+
+    async def _scheduler_loop(self):
+        while True:
+            try:
+                await self._check_schedule()
+            except Exception as e:
+                self.logger.info("SCHEDULER", f"Scheduler error: {type(e).__name__}: {e}")
+            await asyncio.sleep(1)
 
     def update_config(self, section, key, data):
         if section == "generator":
@@ -234,6 +324,12 @@ class RunManager:
         return self._docker_pool
 
     async def cleanup(self):
+        if self._scheduler_task:
+            self._scheduler_task.cancel()
+            try:
+                await self._scheduler_task
+            except asyncio.CancelledError:
+                pass
         await self.stop()
         await self._pool.cleanup()
         if self._docker_pool:
