@@ -7,6 +7,7 @@ from types import SimpleNamespace
 import unittest
 from unittest.mock import AsyncMock, patch
 
+from demo_generator.scheduling import next_daily_run
 from demo_generator.config import load_config
 from demo_generator.web.run_manager import RunConflict, RunManager
 
@@ -68,6 +69,36 @@ class SchedulerTests(unittest.IsolatedAsyncioTestCase):
         await self.manager._check_schedule(self.when)
         self.assertIsNone(self.manager._run_task)
 
+    async def test_daily_schedule_stays_enabled_and_advances_without_duplicate_runs(self):
+        data = {**self.schedule(), "frequency": "daily", "daily_time": "15:00", "timezone": "America/New_York"}
+        saved = self.manager.update_scheduler(data)
+        due = datetime.fromisoformat(saved["scheduled_at"])
+        engine = SimpleNamespace(on=lambda *args: None, run_single_category=AsyncMock(), round_num=0)
+        with patch.object(self.manager, "_get_active_pool", new=AsyncMock()), \
+             patch("demo_generator.web.run_manager.Engine", return_value=engine):
+            await self.manager._check_schedule(due)
+            await self.manager._run_task
+            saved = load_config(self.path)["scheduler"]
+            self.assertTrue(saved["enabled"])
+            next_due = datetime.fromisoformat(saved["scheduled_at"])
+            self.assertGreater(next_due, due)
+            await self.manager._check_schedule(due + timedelta(seconds=1))
+            self.assertEqual(engine.run_single_category.await_count, 2)
+            await self.manager._check_schedule(next_due)
+            await self.manager._run_task
+            self.assertEqual(engine.run_single_category.await_count, 4)
+
+    async def test_overdue_daily_schedule_runs_once_then_skips_missed_days(self):
+        self.manager.update_scheduler({**self.schedule(), "frequency": "daily", "daily_time": "15:00", "timezone": "America/New_York"})
+        late = datetime.fromisoformat(self.manager.config["scheduler"]["scheduled_at"]) + timedelta(days=4, hours=1)
+        engine = SimpleNamespace(on=lambda *args: None, run_single_category=AsyncMock(), round_num=0)
+        with patch.object(self.manager, "_get_active_pool", new=AsyncMock()), \
+             patch("demo_generator.web.run_manager.Engine", return_value=engine):
+            await self.manager._check_schedule(late)
+            await self.manager._run_task
+            self.assertGreater(datetime.fromisoformat(self.manager.config["scheduler"]["scheduled_at"]), late)
+            self.assertEqual(engine.run_single_category.await_count, 2)
+
     async def test_reject_invalid_dates_and_test_selections(self):
         for changes in ({"scheduled_at": "2030-01-01T15:00"}, {"scheduled_at": "nonsense"},
                         {"scheduled_at": None}, {"tests": {}}, {"tests": {"unknown": True}},
@@ -84,6 +115,24 @@ class SchedulerTests(unittest.IsolatedAsyncioTestCase):
                 await self.manager._check_schedule(self.when)
         self.assertTrue(self.manager.config["scheduler"]["enabled"])
         self.assertIsNone(self.manager._run_task)
+
+
+class DailyTimezoneTests(unittest.TestCase):
+    def test_daily_time_remains_local_across_daylight_saving(self):
+        before = datetime(2027, 3, 13, 21, tzinfo=timezone.utc)
+        self.assertEqual(next_daily_run("15:00", "America/New_York", before), datetime(2027, 3, 14, 19, tzinfo=timezone.utc))
+        self.assertEqual(next_daily_run("15:00", "America/New_York", datetime(2027, 11, 6, 20, tzinfo=timezone.utc)), datetime(2027, 11, 7, 20, tzinfo=timezone.utc))
+
+    def test_skipped_hour_moves_forward_and_repeated_hour_runs_once(self):
+        self.assertEqual(next_daily_run("02:30", "America/New_York", datetime(2027, 3, 14, 0, tzinfo=timezone.utc)), datetime(2027, 3, 14, 7, 30, tzinfo=timezone.utc))
+        first = next_daily_run("01:30", "America/New_York", datetime(2027, 11, 7, 0, tzinfo=timezone.utc))
+        self.assertEqual(first, datetime(2027, 11, 7, 5, 30, tzinfo=timezone.utc))
+        self.assertEqual(next_daily_run("01:30", "America/New_York", first), datetime(2027, 11, 8, 6, 30, tzinfo=timezone.utc))
+
+    def test_invalid_daily_settings_rejected(self):
+        for clock, zone in (("25:00", "UTC"), ("3pm", "UTC"), ("15:00", "invalid/zone")):
+            with self.assertRaises(ValueError):
+                next_daily_run(clock, zone, datetime.now(timezone.utc))
 
 
 class BrowserTimezoneTests(unittest.TestCase):
@@ -111,6 +160,18 @@ app.showToast = () => {};
     await app.saveScheduler();
     assert.equal(saved.scheduled_at, '2030-11-10T20:00:00.000Z');
     assert.equal(saved.tests.app_control, true);
+    elements['scheduler-frequency'] = {value: 'daily'};
+    elements['scheduler-daily-time'] = {value: process.env.LOCAL_TIME.slice(11)};
+    app.config.scheduler = {frequency: 'daily', daily_time: '15:00', timezone: 'America/New_York', scheduled_at: '2030-11-10T20:00:00Z'};
+    app.schedulerDailyDisplay = process.env.LOCAL_TIME.slice(11);
+    await app.saveScheduler();
+    assert.equal(saved.frequency, 'daily');
+    assert.equal(saved.timezone, 'America/New_York');
+    assert.equal(saved.daily_time, '15:00');
+    elements['scheduler-daily-time'].value = '12:30';
+    await app.saveScheduler();
+    assert.equal(saved.daily_time, '12:30');
+    assert.equal(saved.timezone, process.env.TZ);
 })().catch(error => { console.error(error); process.exitCode = 1; });
 '''
         root = Path(__file__).resolve().parents[1]

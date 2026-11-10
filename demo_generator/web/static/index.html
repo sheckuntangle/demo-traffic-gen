@@ -142,10 +142,20 @@
                     </div>
                 </div>
                 <div class="card-body">
-                    <p class="text-muted small">Run selected tests once at the chosen time, then disable the scheduler. If another test is running, wait until it finishes. The controller must be running; an overdue schedule runs when it comes back online.</p>
+                    <p class="text-muted small">Run selected tests once or daily at the chosen time. Daily schedules stay enabled. If another test is running, wait until it finishes. The controller must be running; an overdue schedule runs when it comes back online.</p>
                     <fieldset id="scheduler-fields">
+                        <label class="form-label" for="scheduler-frequency">Repeat</label>
+                        <select class="form-select mb-3" style="max-width:340px" id="scheduler-frequency" onchange="App.toggleScheduleFrequency()">
+                            <option value="once">Once</option><option value="daily">Daily</option>
+                        </select>
+                        <div id="scheduler-once-fields">
                         <label class="form-label" for="scheduler-time">Date and time</label>
                         <input class="form-control mb-1" style="max-width:340px" type="datetime-local" id="scheduler-time" step="60">
+                        </div>
+                        <div id="scheduler-daily-fields" hidden>
+                            <label class="form-label" for="scheduler-daily-time">Daily time</label>
+                            <input class="form-control mb-1" style="max-width:340px" type="time" id="scheduler-daily-time" step="60">
+                        </div>
                         <p class="text-muted small" id="scheduler-timezone"></p>
                         <div class="row row-cols-1 row-cols-md-3 g-2 mb-3" id="scheduler-tests"></div>
                     </fieldset>
@@ -167,6 +177,6 @@
 </div>
 
 <script src="/static/bootstrap.bundle.min.js"></script>
-<script src="/static/app.js?v=14"></script>
+<script src="/static/app.js?v=15"></script>
 </body>
 </html>

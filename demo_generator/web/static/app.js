@@ -343,6 +343,11 @@ const App = {
         const schedule = this.config.scheduler || {enabled: false, tests: {}};
         document.getElementById("scheduler-enabled").checked = !!schedule.enabled;
         document.getElementById("scheduler-time").value = this.localDateTime(schedule.scheduled_at);
+        document.getElementById("scheduler-frequency").value = schedule.frequency || "once";
+        const dailyDisplay = schedule.scheduled_at ? this.localDateTime(schedule.scheduled_at).slice(11) : "15:00";
+        this.schedulerDailyDisplay = dailyDisplay;
+        document.getElementById("scheduler-daily-time").value = dailyDisplay;
+        this.toggleScheduleFrequency();
         const zone = Intl.DateTimeFormat().resolvedOptions().timeZone;
         document.getElementById("scheduler-timezone").textContent = `Your local timezone: ${zone}. Everyone sees this time in their own timezone.`;
         document.getElementById("scheduler-tests").innerHTML = Object.entries(CATEGORY_DISPLAY).map(([name, label]) =>
@@ -354,7 +359,19 @@ const App = {
         summary.textContent = schedule.enabled && schedule.scheduled_at
             ? `Scheduled for ${new Date(schedule.scheduled_at).toLocaleString()} (${zone})`
             : schedule.last_run_at ? `Last dispatched: ${new Date(schedule.last_run_at).toLocaleString()}. Scheduler disabled.` : "Scheduler disabled.";
+        if (schedule.frequency === "daily") {
+            document.getElementById("scheduler-timezone").textContent += ` Daily recurrence: ${schedule.daily_time} in ${schedule.timezone}. Editing the time uses your local timezone. When clocks change, skipped times move forward and repeated times run once.`;
+            summary.textContent = schedule.enabled
+                ? `Daily — next run: ${new Date(schedule.scheduled_at).toLocaleString()} (${zone})`
+                : "Daily scheduler disabled.";
+        }
         this.toggleScheduler();
+    },
+
+    toggleScheduleFrequency() {
+        const daily = document.getElementById("scheduler-frequency").value === "daily";
+        document.getElementById("scheduler-once-fields").hidden = daily;
+        document.getElementById("scheduler-daily-fields").hidden = !daily;
     },
 
     toggleScheduler() {
@@ -363,16 +380,23 @@ const App = {
 
     async saveScheduler() {
         const enabled = document.getElementById("scheduler-enabled").checked;
+        const frequency = document.getElementById("scheduler-frequency")?.value || "once";
+        const daily = frequency === "daily";
+        const dailyValue = document.getElementById("scheduler-daily-time")?.value;
+        const previous = this.config.scheduler || {};
+        const preserveZone = daily && previous.frequency === "daily" && dailyValue === this.schedulerDailyDisplay;
+        const daily_time = preserveZone ? previous.daily_time : dailyValue;
+        const timezone = preserveZone ? previous.timezone : Intl.DateTimeFormat().resolvedOptions().timeZone;
         const value = document.getElementById("scheduler-time").value;
         const existing = this.config.scheduler?.scheduled_at;
         // Preserve the exact instant if an unchanged local time falls in a repeated DST hour.
         const date = value ? new Date(existing && this.localDateTime(existing) === value ? existing : value) : null;
-        if (enabled && (!date || !Number.isFinite(date.getTime()) || date <= new Date())) {
+        if (!daily && enabled && (!date || !Number.isFinite(date.getTime()) || date <= new Date())) {
             this.showToast("Choose a future date and time");
             return;
         }
         // Reject local times skipped by a daylight-saving transition.
-        if (date && this.localDateTime(date.toISOString()) !== value) {
+        if (!daily && date && this.localDateTime(date.toISOString()) !== value) {
             this.showToast("That local time does not exist due to a clock change. Choose another time.");
             return;
         }
@@ -381,7 +405,7 @@ const App = {
         try {
             const res = await fetch("/api/config/scheduler", {
                 method: "PUT", headers: {"Content-Type": "application/json"},
-                body: JSON.stringify({enabled, scheduled_at: date ? date.toISOString() : null, tests}),
+                body: JSON.stringify({enabled, frequency, daily_time, timezone, scheduled_at: !daily && date ? date.toISOString() : null, tests}),
             });
             const data = await res.json();
             if (!res.ok) { this.showToast(data.detail || "Could not save scheduler"); return; }

@@ -564,6 +564,9 @@
       "url_reputation": true,
       "idps": true,
       "legitimate": true
-    }
+    },
+    "frequency": "once",
+    "daily_time": "15:00",
+    "timezone": "UTC"
   }
 }

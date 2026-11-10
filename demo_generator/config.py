@@ -44,6 +44,9 @@ DOCKER_DEFAULTS = {
 
 
 SCHEDULER_DEFAULTS = {
+    "frequency": "once",
+    "daily_time": "15:00",
+    "timezone": "UTC",
     "enabled": False,
     "scheduled_at": None,
     "tests": {name: True for name in (*REQUIRED_CATEGORY_KEYS, "legitimate")},

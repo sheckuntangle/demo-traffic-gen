@@ -14,6 +14,7 @@ from ..config import SCHEDULER_DEFAULTS
 from ..engine import Engine, RunMode
 from ..logger import Logger
 from ..stats import Stats
+from ..scheduling import next_daily_run
 from ..clients import ClientPool
 
 
@@ -219,7 +220,14 @@ class RunManager:
         if (not isinstance(tests, dict) or set(tests) - allowed
                 or any(type(value) is not bool for value in tests.values())):
             raise ValueError("Scheduler tests must contain known tests with boolean switches")
+        frequency = data.get("frequency", "once")
+        if frequency not in ("once", "daily"):
+            raise ValueError("Frequency must be once or daily")
+        daily_time = data.get("daily_time", "15:00")
+        zone = data.get("timezone", "UTC")
         scheduled_at = data.get("scheduled_at")
+        if frequency == "daily":
+            scheduled_at = next_daily_run(daily_time, zone, datetime.now(timezone.utc)).isoformat()
         if scheduled_at:
             try:
                 when = datetime.fromisoformat(scheduled_at.replace("Z", "+00:00"))
@@ -234,6 +242,7 @@ class RunManager:
             if not any(tests.values()):
                 raise ValueError("Select at least one test")
         schedule = {"enabled": data["enabled"], "scheduled_at": scheduled_at,
+                    "frequency": frequency, "daily_time": daily_time, "timezone": zone,
                     "tests": {name: tests.get(name, False) for name in SCHEDULER_DEFAULTS["tests"]}}
         previous = self.config["scheduler"]
         self.config["scheduler"] = schedule
@@ -252,7 +261,8 @@ class RunManager:
         if not schedule.get("enabled"):
             return
         when = datetime.fromisoformat(schedule["scheduled_at"].replace("Z", "+00:00"))
-        if (now or datetime.now(timezone.utc)) < when:
+        now = now or datetime.now(timezone.utc)
+        if now < when:
             return
         if self._phase != "idle":
             if not self._scheduler_waiting:
@@ -262,8 +272,12 @@ class RunManager:
         tests = [name for name in SCHEDULER_DEFAULTS["tests"] if schedule["tests"].get(name)]
         # Persist consumption before dispatch so a controller restart cannot repeat it.
         previous = copy.deepcopy(schedule)
-        schedule["enabled"] = False
-        schedule["last_run_at"] = datetime.now(timezone.utc).isoformat()
+        if schedule.get("frequency", "once") == "daily":
+            schedule["scheduled_at"] = next_daily_run(
+                schedule["daily_time"], schedule["timezone"], now).isoformat()
+        else:
+            schedule["enabled"] = False
+        schedule["last_run_at"] = now.isoformat()
         try:
             self._save_config()
         except Exception:
