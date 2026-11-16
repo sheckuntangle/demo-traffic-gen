@@ -6,3 +6,5 @@ fastapi>=0.104.0
 uvicorn[standard]>=0.24.0
 docker>=7.0.0
 aiohttp>=3.9.0
+# IANA timezone database for daily scheduling when the OS does not provide it.
+tzdata>=2024.1

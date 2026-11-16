@@ -2,6 +2,7 @@ from datetime import datetime, timedelta, timezone
 import os
 from pathlib import Path
 import subprocess
+import sys
 import tempfile
 from types import SimpleNamespace
 import unittest
@@ -118,6 +119,17 @@ class SchedulerTests(unittest.IsolatedAsyncioTestCase):
 
 
 class DailyTimezoneTests(unittest.TestCase):
+    def test_daily_schedule_without_system_timezone_database(self):
+        result = subprocess.run(
+            [sys.executable, "-c", "from datetime import datetime, timezone; "
+             "from demo_generator.scheduling import next_daily_run; "
+             "assert next_daily_run('15:00', 'America/New_York', "
+             "datetime(2027, 3, 14, tzinfo=timezone.utc)) == "
+             "datetime(2027, 3, 14, 19, tzinfo=timezone.utc)"],
+            env={**os.environ, "PYTHONTZPATH": ""}, capture_output=True, text=True,
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
+
     def test_daily_time_remains_local_across_daylight_saving(self):
         before = datetime(2027, 3, 13, 21, tzinfo=timezone.utc)
         self.assertEqual(next_daily_run("15:00", "America/New_York", before), datetime(2027, 3, 14, 19, tzinfo=timezone.utc))
