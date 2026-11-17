@@ -352,10 +352,10 @@ const App = {
         const zone = Intl.DateTimeFormat().resolvedOptions().timeZone;
         document.getElementById("scheduler-timezone").textContent = `Your local timezone: ${zone}. Everyone sees this time in their own timezone.`;
         document.getElementById("scheduler-tests").innerHTML = Object.entries(CATEGORY_DISPLAY).map(([name, label]) =>
-            `<div class="col"><div class="d-flex align-items-center gap-2"><div class="form-check form-switch flex-grow-1">
+            `<div class="col"><div class="d-inline-flex align-items-center gap-2 border rounded px-3 py-2"><div class="form-check form-switch mb-0">
                 <input class="form-check-input" type="checkbox" role="switch" id="schedule-${name}" data-schedule-test="${name}" ${schedule.tests[name] ? "checked" : ""}>
                 <label class="form-check-label" for="schedule-${name}">${label}</label>
-            </div><input class="form-control form-control-sm" style="width:85px" type="number" min="1" max="1000" step="1" id="schedule-count-${name}" aria-label="${label} run count" value="${Number.isInteger(schedule.run_counts?.[name]) ? schedule.run_counts[name] : 1}"></div></div>`).join("");
+            </div><input class="form-control form-control-sm flex-shrink-0" style="width:85px" type="number" min="1" max="1000" step="1" id="schedule-count-${name}" aria-label="${label} run count" value="${Number.isInteger(schedule.run_counts?.[name]) ? schedule.run_counts[name] : 1}"><label class="small text-muted mb-0" for="schedule-count-${name}">runs</label></div></div>`).join("");
         const summary = document.getElementById("scheduler-summary");
         summary.textContent = schedule.enabled && schedule.scheduled_at
             ? `Scheduled for ${new Date(schedule.scheduled_at).toLocaleString()} (${zone})`
