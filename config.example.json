@@ -567,6 +567,19 @@
     },
     "frequency": "once",
     "daily_time": "15:00",
-    "timezone": "UTC"
+    "timezone": "UTC",
+    "run_counts": {
+      "app_control": 1,
+      "dns_filter": 1,
+      "geo_ip": 1,
+      "web_filter": 1,
+      "dynamic_blocklist": 1,
+      "security": 1,
+      "ip_reputation": 1,
+      "url_reputation": 1,
+      "idps": 1,
+      "legitimate": 1
+    },
+    "randomize_order": false
   }
 }

@@ -342,6 +342,7 @@ const App = {
     renderScheduler() {
         const schedule = this.config.scheduler || {enabled: false, tests: {}};
         document.getElementById("scheduler-enabled").checked = !!schedule.enabled;
+        document.getElementById("scheduler-randomize").checked = !!schedule.randomize_order;
         document.getElementById("scheduler-time").value = this.localDateTime(schedule.scheduled_at);
         document.getElementById("scheduler-frequency").value = schedule.frequency || "once";
         const dailyDisplay = schedule.scheduled_at ? this.localDateTime(schedule.scheduled_at).slice(11) : "15:00";
@@ -351,10 +352,10 @@ const App = {
         const zone = Intl.DateTimeFormat().resolvedOptions().timeZone;
         document.getElementById("scheduler-timezone").textContent = `Your local timezone: ${zone}. Everyone sees this time in their own timezone.`;
         document.getElementById("scheduler-tests").innerHTML = Object.entries(CATEGORY_DISPLAY).map(([name, label]) =>
-            `<div class="col"><div class="form-check form-switch">
+            `<div class="col"><div class="d-flex align-items-center gap-2"><div class="form-check form-switch flex-grow-1">
                 <input class="form-check-input" type="checkbox" role="switch" id="schedule-${name}" data-schedule-test="${name}" ${schedule.tests[name] ? "checked" : ""}>
                 <label class="form-check-label" for="schedule-${name}">${label}</label>
-            </div></div>`).join("");
+            </div><input class="form-control form-control-sm" style="width:85px" type="number" min="1" max="1000" step="1" id="schedule-count-${name}" aria-label="${label} run count" value="${Number.isInteger(schedule.run_counts?.[name]) ? schedule.run_counts[name] : 1}"></div></div>`).join("");
         const summary = document.getElementById("scheduler-summary");
         summary.textContent = schedule.enabled && schedule.scheduled_at
             ? `Scheduled for ${new Date(schedule.scheduled_at).toLocaleString()} (${zone})`
@@ -401,11 +402,21 @@ const App = {
             return;
         }
         const tests = {};
+        const run_counts = {};
         document.querySelectorAll("[data-schedule-test]").forEach(input => { tests[input.dataset.scheduleTest] = input.checked; });
+        for (const name of Object.keys(tests)) {
+            const count = Number(document.getElementById(`schedule-count-${name}`)?.value ?? 1);
+            if (!Number.isInteger(count) || count < 1 || count > 1000) {
+                this.showToast("Run counts must be whole numbers from 1 to 1000");
+                return;
+            }
+            run_counts[name] = count;
+        }
+        const randomize_order = !!document.getElementById("scheduler-randomize")?.checked;
         try {
             const res = await fetch("/api/config/scheduler", {
                 method: "PUT", headers: {"Content-Type": "application/json"},
-                body: JSON.stringify({enabled, frequency, daily_time, timezone, scheduled_at: !daily && date ? date.toISOString() : null, tests}),
+                body: JSON.stringify({enabled, frequency, daily_time, timezone, scheduled_at: !daily && date ? date.toISOString() : null, tests, run_counts, randomize_order}),
             });
             const data = await res.json();
             if (!res.ok) { this.showToast(data.detail || "Could not save scheduler"); return; }

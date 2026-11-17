@@ -365,13 +365,14 @@ class Engine:
 
     # --- Single-category run (for "Run Now" from GUI) ---
 
-    async def run_single_category(self, category_name):
+    async def run_single_category(self, category_name, reset_stats=True):
         all_categories = get_all_categories()
         cat_cls = all_categories.get(category_name)
         if not cat_cls:
             raise ValueError(f"Unknown category: {category_name}")
 
-        self._stats.reset_category(category_name)
+        if reset_stats:
+            self._stats.reset_category(category_name)
         self._logger.info("SYSTEM", f"Initializing browser pool...")
         await self._pool.start()
         self._logger.info("SYSTEM", f"Running single category: {cat_cls.display_name}")

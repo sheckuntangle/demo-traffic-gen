@@ -65,6 +65,38 @@ class SchedulerTests(unittest.IsolatedAsyncioTestCase):
         self.assertIsNone(self.manager._run_task)
         self.manager._phase = "idle"
 
+    async def test_counts_persist_and_shuffle_individual_runs(self):
+        for randomized in (False, True):
+            saved = self.manager.update_scheduler({**self.schedule(),
+                "run_counts": {"app_control": 2, "legitimate": 3, "dns_filter": 7},
+                "randomize_order": randomized})
+            self.assertEqual(load_config(self.path)["scheduler"], saved)
+            engine = SimpleNamespace(on=lambda *args: None, run_single_category=AsyncMock(), round_num=0)
+            def interleave(queue):
+                self.assertEqual(queue, ["app_control"] * 2 + ["legitimate"] * 3)
+                queue[:] = ["legitimate", "app_control", "legitimate", "app_control", "legitimate"]
+            with patch.object(self.manager, "_get_active_pool", new=AsyncMock()), \
+                 patch("demo_generator.web.run_manager.Engine", return_value=engine), \
+                 patch("demo_generator.web.run_manager.random.shuffle", side_effect=interleave) as shuffle:
+                await self.manager._check_schedule(self.when)
+                await self.manager._run_task
+                actual = [call.args[0] for call in engine.run_single_category.call_args_list]
+                expected = (["legitimate", "app_control", "legitimate", "app_control", "legitimate"]
+                            if randomized else ["app_control"] * 2 + ["legitimate"] * 3)
+                self.assertEqual(actual, expected)
+                self.assertEqual(shuffle.call_count, int(randomized))
+                self.assertTrue(all(call.kwargs == {"reset_stats": False}
+                                    for call in engine.run_single_category.call_args_list))
+
+    async def test_invalid_counts_and_randomization_rejected(self):
+        for counts in ({"legitimate": 0}, {"legitimate": -1}, {"legitimate": 1.5},
+                       {"legitimate": True}, {"legitimate": "5"}, {"legitimate": 1001},
+                       {"unknown": 2}, []):
+            with self.subTest(counts=counts), self.assertRaises(ValueError):
+                self.manager.update_scheduler({**self.schedule(), "run_counts": counts})
+        with self.assertRaises(ValueError):
+            self.manager.update_scheduler({**self.schedule(), "randomize_order": "yes"})
+
     async def test_disabled_schedule_never_dispatches(self):
         self.manager.update_scheduler({**self.schedule(), "enabled": False})
         await self.manager._check_schedule(self.when)
@@ -156,6 +188,8 @@ const assert = require('assert');
 const elements = {
     'scheduler-enabled': {checked: true},
     'scheduler-time': {value: process.env.LOCAL_TIME},
+    'schedule-count-app_control': {value: '5'},
+    'scheduler-randomize': {checked: true},
 };
 let saved;
 const context = vm.createContext({
@@ -172,6 +206,8 @@ app.showToast = () => {};
     await app.saveScheduler();
     assert.equal(saved.scheduled_at, '2030-11-10T20:00:00.000Z');
     assert.equal(saved.tests.app_control, true);
+    assert.equal(saved.run_counts.app_control, 5);
+    assert.equal(saved.randomize_order, true);
     elements['scheduler-frequency'] = {value: 'daily'};
     elements['scheduler-daily-time'] = {value: process.env.LOCAL_TIME.slice(11)};
     app.config.scheduler = {frequency: 'daily', daily_time: '15:00', timezone: 'America/New_York', scheduled_at: '2030-11-10T20:00:00Z'};

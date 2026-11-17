@@ -50,6 +50,8 @@ SCHEDULER_DEFAULTS = {
     "enabled": False,
     "scheduled_at": None,
     "tests": {name: True for name in (*REQUIRED_CATEGORY_KEYS, "legitimate")},
+    "run_counts": {name: 1 for name in (*REQUIRED_CATEGORY_KEYS, "legitimate")},
+    "randomize_order": False,
 }
 
 

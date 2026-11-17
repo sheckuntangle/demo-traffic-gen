@@ -4,6 +4,7 @@ import asyncio
 import copy
 import json
 import os
+import random
 import tempfile
 import logging
 from collections import deque
@@ -151,10 +152,13 @@ class RunManager:
             self._phase = "running"
             self._publish_status()
             if scheduled_tests is not None:
-                for name in scheduled_tests:
+                for name in set(scheduled_tests):
+                    self.stats.reset_category(name)
+                for index, name in enumerate(scheduled_tests, 1):
+                    self.logger.info("SCHEDULER", f"Scheduled run {index}/{len(scheduled_tests)}: {name}")
                     self._active_category = name
                     self._publish_status()
-                    await self._engine.run_single_category(name)
+                    await self._engine.run_single_category(name, reset_stats=False)
                 self.logger.info("SCHEDULER", "Scheduled tests completed.")
             elif category:
                 await self._engine.run_single_category(category)
@@ -221,6 +225,13 @@ class RunManager:
                 or any(type(value) is not bool for value in tests.values())):
             raise ValueError("Scheduler tests must contain known tests with boolean switches")
         frequency = data.get("frequency", "once")
+        run_counts = data.get("run_counts", {})
+        if (not isinstance(run_counts, dict) or set(run_counts) - allowed
+                or any(type(count) is not int or not 1 <= count <= 1000 for count in run_counts.values())):
+            raise ValueError("Run counts must be whole numbers from 1 to 1000 for known tests")
+        randomize_order = data.get("randomize_order", False)
+        if type(randomize_order) is not bool:
+            raise ValueError("Randomize order must be true or false")
         if frequency not in ("once", "daily"):
             raise ValueError("Frequency must be once or daily")
         daily_time = data.get("daily_time", "15:00")
@@ -242,6 +253,8 @@ class RunManager:
             if not any(tests.values()):
                 raise ValueError("Select at least one test")
         schedule = {"enabled": data["enabled"], "scheduled_at": scheduled_at,
+                    "run_counts": {name: run_counts.get(name, 1) for name in SCHEDULER_DEFAULTS["tests"]},
+                    "randomize_order": randomize_order,
                     "frequency": frequency, "daily_time": daily_time, "timezone": zone,
                     "tests": {name: tests.get(name, False) for name in SCHEDULER_DEFAULTS["tests"]}}
         previous = self.config["scheduler"]
@@ -269,7 +282,10 @@ class RunManager:
                 self.logger.info("SCHEDULER", "Scheduled time reached; waiting for the active test to finish.")
                 self._scheduler_waiting = True
             return  # Wait for the active test; never overlap runs.
-        tests = [name for name in SCHEDULER_DEFAULTS["tests"] if schedule["tests"].get(name)]
+        tests = [name for name in SCHEDULER_DEFAULTS["tests"] if schedule["tests"].get(name)
+                 for _ in range(schedule.get("run_counts", {}).get(name, 1))]
+        if schedule.get("randomize_order", False):
+            random.shuffle(tests)
         # Persist consumption before dispatch so a controller restart cannot repeat it.
         previous = copy.deepcopy(schedule)
         if schedule.get("frequency", "once") == "daily":
