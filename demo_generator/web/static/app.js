@@ -37,7 +37,7 @@ const CATEGORY_SCHEMAS = {
     ],
 };
 
-const MAX_LOG_LINES = 1000;
+const MAX_LOG_LINES = 10000;
 
 const App = {
     ws: null,

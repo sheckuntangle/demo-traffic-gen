@@ -46,7 +46,7 @@ class RunManager:
         self.ws_clients = set()
         self._active_category = None
         self._phase = "idle"
-        self._history = deque(maxlen=1000)
+        self._history = deque(maxlen=10000)
         history_path = os.path.join(config["generator"].get("log_dir", "./logs"), "web_history.jsonl")
         for path in (history_path + ".1", history_path):
             try:
