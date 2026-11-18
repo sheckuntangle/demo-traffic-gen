@@ -198,20 +198,23 @@ class RunManager:
             outcome = f"error: {type(e).__name__}: {e}"
             self.logger.info("ERROR", f"Test error: {type(e).__name__}: {e}")
         finally:
-            if scheduled_tests is not None:
-                self.logger.info("SCHEDULER", f"Schedule finished: {outcome}; started={began.isoformat()}; "
-                    f"elapsed={(datetime.now(timezone.utc) - began).total_seconds():.1f}s including startup; "
-                    f"next daily run={self.config['scheduler'].get('scheduled_at') if self.config['scheduler'].get('enabled') else 'disabled'}")
-                if self._engine:
-                    self._engine.log_summary("SCHEDULE SUMMARY", outcome)
-                else:
-                    self.logger.info("SCHEDULE SUMMARY", "No tests started; client startup failed or was cancelled.")
+            if outcome == "completed" and self._phase == "stopping":
+                outcome = "stopped by user/controller"
             self._phase = "stopping"
             self._publish_status()
             try:
                 if self._docker_pool:
                     await self._docker_pool.cleanup()
             finally:
+                label = "SCHEDULE SUMMARY" if scheduled_tests is not None else "RUN SUMMARY"
+                self.logger.info(label, f"Run finished: {outcome}; started={began.isoformat()}; "
+                    f"elapsed={(datetime.now(timezone.utc) - began).total_seconds():.1f}s including startup and cleanup")
+                if scheduled_tests is not None:
+                    self.logger.info(label, f"Next daily run: {self.config['scheduler'].get('scheduled_at') if self.config['scheduler'].get('enabled') else 'disabled'}")
+                if self._engine:
+                    self._engine.log_summary(label, outcome)
+                else:
+                    self.logger.info(label, f"No tests started; {outcome}; check client startup logs.")
                 self._phase = "idle"
                 self._active_category = None
                 self._scheduled_tests = None

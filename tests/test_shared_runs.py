@@ -5,7 +5,7 @@ from pathlib import Path
 import tempfile
 import unittest
 from types import SimpleNamespace
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock, Mock, patch
 
 from fastapi import HTTPException, WebSocketDisconnect
 
@@ -63,7 +63,7 @@ class SharedRunsTests(unittest.IsolatedAsyncioTestCase):
                 self.assertEqual(self.manager.get_status()["phase"], "idle")
 
     async def test_completion_and_failure_release_runner(self):
-        engine = SimpleNamespace(on=lambda *args: None, run_single_category=AsyncMock(),
+        engine = SimpleNamespace(log_summary=Mock(), on=lambda *args: None, run_single_category=AsyncMock(),
                                  start=AsyncMock(), round_num=0)
         with patch.object(self.manager, "_get_active_pool", new=AsyncMock()), \
              patch("demo_generator.web.run_manager.Engine", return_value=engine):
@@ -81,7 +81,7 @@ class SharedRunsTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_manual_repetitions_run_sequentially_without_resetting_stats(self):
         from unittest.mock import call
-        engine = SimpleNamespace(on=lambda *args: None, run_single_category=AsyncMock(), round_num=0)
+        engine = SimpleNamespace(log_summary=Mock(), on=lambda *args: None, run_single_category=AsyncMock(), round_num=0)
         with patch.object(self.manager, "_get_active_pool", new=AsyncMock()), \
              patch("demo_generator.web.run_manager.Engine", return_value=engine), \
              patch.object(self.manager.stats, "reset_category") as reset:
@@ -100,7 +100,7 @@ class SharedRunsTests(unittest.IsolatedAsyncioTestCase):
         async def run(*args, **kwargs):
             entered.set()
             await asyncio.Event().wait()
-        engine = SimpleNamespace(on=lambda *args: None, run_single_category=AsyncMock(side_effect=run),
+        engine = SimpleNamespace(log_summary=Mock(), on=lambda *args: None, run_single_category=AsyncMock(side_effect=run),
                                  request_stop=lambda: None, round_num=0)
         with patch.object(self.manager, "_get_active_pool", new=AsyncMock()), \
              patch("demo_generator.web.run_manager.Engine", return_value=engine):
@@ -109,6 +109,33 @@ class SharedRunsTests(unittest.IsolatedAsyncioTestCase):
             await self.manager.stop()
             self.assertEqual(engine.run_single_category.await_count, 1)
             self.assertFalse(self.manager.get_status()["running"])
+
+    async def test_stopped_full_run_prints_client_summary_after_docker_cleanup(self):
+        from demo_generator.primitives import TestResult
+        entered = asyncio.Event()
+        async def run(category, config):
+            category.emit_result(TestResult("DNS", "example.com", True))
+            entered.set()
+            await asyncio.Event().wait()
+        client = SimpleNamespace(profile=SimpleNamespace(name="client-50"), macvlan_ip="192.168.77.50", run_category=run)
+        pool = SimpleNamespace(start=AsyncMock(), get_clients=lambda: [client])
+        self.manager.config["generator"].update(round_interval_seconds=300, legitimate_interval_seconds=45, max_rounds=0)
+        self.manager.config["categories"] = {}
+        async def cleanup():
+            self.manager.logger.info("DOCKER", "All 1 Docker client containers stopped and removed.")
+        self.manager._docker_pool = SimpleNamespace(cleanup=cleanup)
+        with patch.object(self.manager, "_get_active_pool", new=AsyncMock(return_value=pool)):
+            await self.manager.start("full")
+            await asyncio.wait_for(entered.wait(), 1)
+            await self.manager.stop()
+        entries = self.manager.get_log_history()
+        cleanup_index = next(i for i, entry in enumerate(entries) if "All 1 Docker" in entry["message"])
+        summary_index = next(i for i, entry in enumerate(entries) if entry["category"] == "RUN SUMMARY")
+        self.assertLess(cleanup_index, summary_index)
+        summary = "\n".join(entry["message"] for entry in entries if entry["category"] == "RUN SUMMARY")
+        for text in ("stopped by user/controller", "client-50", "192.168.77.50", "legitimate", "1 passed", "1 cancelled"):
+            self.assertIn(text, summary)
+        self.assertFalse(self.manager.get_status()["running"])
 
     async def test_invalid_manual_counts_do_not_reserve_runner(self):
         from pydantic import ValidationError

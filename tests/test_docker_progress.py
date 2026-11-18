@@ -9,6 +9,30 @@ from demo_generator.docker_clients import DockerClientPool
 
 
 class DockerProgressTests(unittest.IsolatedAsyncioTestCase):
+    async def test_successful_cleanup_emits_one_confirmation(self):
+        containers = [SimpleNamespace(name=f"client-{index}", remove=Mock()) for index in range(10)]
+        self.pool._containers = containers
+        with patch.object(self.pool, "_log") as log:
+            await self.pool.cleanup()
+        self.assertEqual(log.call_count, 1)
+        self.assertEqual(log.call_args.args[0], "All 10 Docker client containers stopped and removed.")
+        for container in containers:
+            container.remove.assert_called_once_with(force=True)
+        self.assertEqual(self.pool._containers, [])
+
+    async def test_cleanup_failures_remain_visible_and_can_be_retried(self):
+        container = SimpleNamespace(name="client-failed", remove=Mock(side_effect=RuntimeError("daemon unavailable")))
+        self.pool._containers = [container]
+        with patch.object(self.pool, "_log") as log:
+            await self.pool.cleanup()
+        messages = [call.args[0] for call in log.call_args_list]
+        self.assertTrue(any("client-failed" in message and "daemon unavailable" in message for message in messages))
+        self.assertIn("0/1 containers", messages[-1])
+        self.assertEqual(self.pool._containers, [container])
+        container.remove.side_effect = None
+        await self.pool.cleanup()
+        self.assertEqual(self.pool._containers, [])
+
     async def asyncSetUp(self):
         self.messages = []
         self.pool = DockerClientPool({"generator": {}, "docker": {"start_ip": "10.0.1.101", "client_count": 1}}, self.messages.append)

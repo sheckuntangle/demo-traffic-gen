@@ -180,8 +180,9 @@ class DockerClientPool:
         if self._progress and self._loop:
             self._loop.call_soon_threadsafe(self._progress, message)
 
-    async def _docker_call(self, label, function, *args, **kwargs):
-        self._log(label)
+    async def _docker_call(self, label, function, *args, report_progress=True, **kwargs):
+        if report_progress:
+            self._log(label)
         started = time.monotonic()
         task = asyncio.create_task(asyncio.to_thread(function, *args, **kwargs))
         try:
@@ -189,7 +190,8 @@ class DockerClientPool:
                 done, _ = await asyncio.wait({task}, timeout=10)
                 if done:
                     result = task.result()
-                    self._log(f"{label} — done ({time.monotonic() - started:.1f}s)")
+                    if report_progress:
+                        self._log(f"{label} — done ({time.monotonic() - started:.1f}s)")
                     return result
                 self._log(f"{label} — still working ({time.monotonic() - started:.0f}s)")
         except asyncio.CancelledError:
@@ -200,7 +202,8 @@ class DockerClientPool:
             finally:
                 raise
         except Exception as e:
-            self._log(f"ERROR: {label} failed: {type(e).__name__}: {e}")
+            if report_progress:
+                self._log(f"ERROR: {label} failed: {type(e).__name__}: {e}")
             raise
 
     @property
@@ -378,13 +381,21 @@ class DockerClientPool:
             self._log("Recycled all Docker client browser contexts")
 
     async def cleanup(self):
+        total = len(self._containers)
+        failed = []
         for container in self._containers:
             try:
-                await self._docker_call(f"Removing container {container.name}", container.remove, force=True)
+                await self._docker_call(f"Removing container {container.name}", container.remove, force=True, report_progress=False)
             except Exception as e:
+                failed.append(container)
                 self._log(f"ERROR: Failed to remove '{container.name}': {e}")
-        self._containers = []
+        self._containers = failed
         self._clients = []
+        if total:
+            if failed:
+                self._log(f"Docker cleanup: {total - len(failed)}/{total} containers stopped and removed; {len(failed)} failed (retained for retry).")
+            else:
+                self._log(f"All {total} Docker client containers stopped and removed.")
 
     def get_status(self):
         self._init_docker()
