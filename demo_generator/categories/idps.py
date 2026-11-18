@@ -3,6 +3,7 @@
 import asyncio
 import os
 import random
+import signal
 import tempfile
 import time
 
@@ -30,6 +31,7 @@ class IDPS(TestCategory):
             target = f"SID {sid} - {description}" if sid else description
 
             fd, script_path = tempfile.mkstemp(suffix=".sh")
+            proc = None
             try:
                 with os.fdopen(fd, "w") as f:
                     f.write("#!/bin/sh\n")
@@ -42,12 +44,16 @@ class IDPS(TestCategory):
                     "/bin/sh", script_path,
                     stdout=asyncio.subprocess.PIPE,
                     stderr=asyncio.subprocess.STDOUT,
+                    start_new_session=True,
                 )
                 try:
-                    await asyncio.wait_for(proc.wait(), timeout=15)
+                    await asyncio.wait_for(proc.communicate(), timeout=15)
                 except asyncio.TimeoutError:
-                    proc.kill()
-                    await proc.wait()
+                    try:
+                        os.killpg(proc.pid, signal.SIGKILL)
+                    except ProcessLookupError:
+                        pass
+                    await proc.communicate()
 
                 elapsed = (time.monotonic() - start) * 1000
                 success = proc.returncode == 0
@@ -72,6 +78,12 @@ class IDPS(TestCategory):
                 self.emit_result(r)
                 results.append(r)
             finally:
+                if proc is not None and proc.returncode is None:
+                    try:
+                        os.killpg(proc.pid, signal.SIGKILL)
+                    except ProcessLookupError:
+                        pass
+                    await proc.communicate()
                 try:
                     os.unlink(script_path)
                 except OSError:

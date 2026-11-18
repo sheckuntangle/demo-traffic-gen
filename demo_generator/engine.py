@@ -4,6 +4,9 @@ import asyncio
 import copy
 import random
 import traceback
+import time
+import uuid
+from collections import defaultdict
 from enum import Enum
 
 from .categories import get_all_categories
@@ -30,6 +33,7 @@ class Engine:
         self._round_num = 0
         self._mode = None
         self._active_tasks = []
+        self._activity = []
         self._callbacks = {
             "on_round_start": [],
             "on_test_complete": [],
@@ -94,17 +98,35 @@ class Engine:
 
     # --- Full mode: concurrent legit + trigger loops ---
 
-    async def _run_full_mode(self):
-        legit_task = asyncio.create_task(self._legitimate_loop())
-        trigger_task = asyncio.create_task(self._trigger_loop())
-        self._active_tasks = [legit_task, trigger_task]
+    async def run_timed(self, seconds, selected_tests):
+        """Run concurrent interval loops until the duration expires, cancelling in-flight work."""
+        self._running = True
+        self._stop_requested = False
+        self._mode = RunMode.FULL
         try:
-            await asyncio.gather(legit_task, trigger_task)
-        except asyncio.CancelledError:
-            legit_task.cancel()
-            trigger_task.cancel()
-            raise
+            await self._pool.start()
+            await asyncio.wait_for(self._run_full_mode(
+                include_legitimate="legitimate" in selected_tests,
+                include_triggers=any(name != "legitimate" for name in selected_tests),
+            ), timeout=seconds)
+        except asyncio.TimeoutError:
+            self._logger.info("SCHEDULER", "Duration reached; stopped interval loops and in-flight tests.")
         finally:
+            self._running = False
+
+    async def _run_full_mode(self, include_legitimate=True, include_triggers=True):
+        tasks = []
+        if include_legitimate:
+            tasks.append(asyncio.create_task(self._legitimate_loop()))
+        if include_triggers:
+            tasks.append(asyncio.create_task(self._trigger_loop()))
+        self._active_tasks = list(tasks)
+        try:
+            await asyncio.gather(*tasks)
+        finally:
+            for task in tasks:
+                task.cancel()
+            await asyncio.gather(*tasks, return_exceptions=True)
             self._active_tasks = []
 
     async def _legitimate_loop(self):
@@ -304,17 +326,26 @@ class Engine:
                     client, cat_instance, config_override=config_copy)))
         return tasks
 
-    def _make_result_callback(self, category, client_name):
+    def _make_result_callback(self, category, client_name, activity=None):
         def on_result(result):
             result.client_name = client_name
             result.category = category.name
-            status = "PASS" if result.success else "FAIL"
+            phase = result.test_type == "INFO"
+            status = "INFO" if phase else ("PASS" if result.success else "FAIL")
+            message = result.message
+            if activity is not None and not phase:
+                message = f"{message}; elapsed={result.duration_ms / 1000:.2f}s; execution={activity['id']}"
             self._logger.log_result(
                 category.name, result.test_type, result.target,
-                status, result.message, client_name=client_name,
+                status, message, client_name=client_name,
                 round_num=self._round_num,
             )
-            self._stats.record(category.name, result.success)
+            if not phase:
+                self._stats.record(category.name, result.success)
+            if activity is not None and result.test_type != "INFO":
+                activity["passed" if result.success else "failed"] += 1
+                if not result.success and len(activity["failures"]) < 5:
+                    activity["failures"].append(f"{result.test_type} {result.target}: {result.message}")
             self._emit("on_test_complete", result=result)
         return on_result
 
@@ -323,17 +354,27 @@ class Engine:
             return
 
         client_name = client.profile.name
+        source_ip = getattr(client, "macvlan_ip", None) or getattr(client.profile, "source_ip", None) or "host/default route"
+        started = time.monotonic()
+        activity = {"id": uuid.uuid4().hex[:8], "client": client_name, "source_ip": source_ip,
+                    "category": category.name, "passed": 0, "failed": 0, "failures": [], "status": "completed"}
         self._logger.info(category.display_name,
-                          f"[{client_name}] Running {category.display_name} tests")
+                          f"[{client_name}] Starting {category.display_name}; source={source_ip}; execution={activity['id']}")
 
-        category._on_result = self._make_result_callback(category, client_name)
+        category._on_result = self._make_result_callback(category, client_name, activity)
 
         run_config = config_override or self._config
         try:
             results = await client.run_category(category, run_config)
+            for result in results:
+                if not result.client_name:
+                    category.emit_result(result)
         except asyncio.CancelledError:
+            activity["status"] = "cancelled"
             raise
         except Exception as e:
+            activity["status"] = "error"
+            activity["failed"] += 1
             error_msg = f"{type(e).__name__}: {e}"
             tb = traceback.format_exc()
             self._logger.log_result(
@@ -347,21 +388,35 @@ class Engine:
             return
         finally:
             category._on_result = None
-
-        for result in results:
-            if result.client_name:
-                continue
-            result.client_name = client_name
-            status = "PASS" if result.success else "FAIL"
-            self._logger.log_result(
-                category.name, result.test_type, result.target,
-                status, result.message, client_name=client_name,
-                round_num=self._round_num,
-            )
-            self._stats.record(category.name, result.success)
-            self._emit("on_test_complete", result=result)
+            activity["seconds"] = time.monotonic() - started
+            self._activity.append(activity)
+            self._logger.info("TEST SUMMARY",
+                f"[{client_name}] {category.display_name}: {activity['status']}; source={source_ip}; "
+                f"execution={activity['id']}; {activity['passed']} passed, {activity['failed']} failed; "
+                f"elapsed={activity['seconds']:.1f}s (phase announcements excluded)")
+            for failure in activity["failures"]:
+                self._logger.info("TEST SUMMARY", f"[{client_name}] execution={activity['id']}; failure: {failure}")
 
         self._logger.separator(category.display_name)
+
+    def log_summary(self, label, outcome):
+        groups = defaultdict(list)
+        for activity in self._activity:
+            groups[(activity["client"], activity["source_ip"], activity["category"])].append(activity)
+        self._logger.info(label, f"Run summary: {outcome}; {len(self._activity)} section/client executions; "
+                          f"{len({a['client'] for a in self._activity})} clients used; "
+                          f"{sum(a['passed'] for a in self._activity)} passed, "
+                          f"{sum(a['failed'] for a in self._activity)} failed checks; "
+                          f"{sum(a['status'] == 'cancelled' for a in self._activity)} cancelled executions. "
+                          "Pass/fail reflects configured policy expectations; phase announcements excluded.")
+        for (client, source, category), entries in sorted(groups.items()):
+            self._logger.info(label, f"[{client}] source={source}; {category}: {len(entries)} executions; "
+                f"{sum(a['passed'] for a in entries)} passed, {sum(a['failed'] for a in entries)} failed; "
+                f"{sum(a['status'] == 'cancelled' for a in entries)} cancelled, "
+                f"{sum(a['status'] == 'error' for a in entries)} errors; "
+                f"elapsed total={sum(a['seconds'] for a in entries):.1f}s")
+        if not groups:
+            self._logger.info(label, "No section/client executions started. Check startup errors and the duration versus trigger interval.")
 
     # --- Single-category run (for "Run Now" from GUI) ---
 

@@ -144,10 +144,22 @@ class RunManager:
         self._reserve(mode=RunMode(mode))
         self._run_task = asyncio.create_task(self._execute_run())
 
-    async def _execute_run(self, category=None, scheduled_tests=None, run_count=1):
+    async def _execute_run(self, category=None, scheduled_tests=None, run_count=1, scheduled_settings=None):
+        outcome = "completed"
+        began = datetime.now(timezone.utc)
         try:
+            run_config = copy.deepcopy(self.config) if scheduled_tests is not None else self.config
+            timed = scheduled_tests is not None and (scheduled_settings or {}).get("execution_mode") == "duration"
+            if timed:
+                for name, settings in run_config.get("categories", {}).items():
+                    settings["enabled"] = name in scheduled_tests
+                run_config["generator"]["max_rounds"] = 0
+                self.logger.info("SCHEDULER", f"Duration mode: {scheduled_settings['duration_minutes']} minutes after client startup; "
+                    f"legitimate interval={run_config['generator'].get('legitimate_interval_seconds', 45)}s; "
+                    f"trigger interval={run_config['generator']['round_interval_seconds']}s (also delays first trigger); "
+                    f"selected={', '.join(scheduled_tests)}; counts, shuffle and max rounds do not apply.")
             pool = await self._get_active_pool()
-            self._engine = Engine(self.config, self.logger, self.stats, pool=pool)
+            self._engine = Engine(run_config, self.logger, self.stats, pool=pool)
             self._engine.on("on_round_start", lambda **kw: self.broadcast({
                 "type": "round_start", "data": kw
             }))
@@ -162,11 +174,15 @@ class RunManager:
             if scheduled_tests is not None:
                 for name in set(scheduled_tests):
                     self.stats.reset_category(name)
-                for index, name in enumerate(scheduled_tests, 1):
-                    self.logger.info("SCHEDULER", f"Scheduled run {index}/{len(scheduled_tests)}: {name}")
-                    self._active_category = name
-                    self._publish_status()
-                    await self._engine.run_single_category(name, reset_stats=False)
+                if timed:
+                    await self._engine.run_timed(scheduled_settings["duration_minutes"] * 60, scheduled_tests)
+                    outcome = "duration reached"
+                else:
+                    for index, name in enumerate(scheduled_tests, 1):
+                        self.logger.info("SCHEDULER", f"Scheduled run {index}/{len(scheduled_tests)}: {name}")
+                        self._active_category = name
+                        self._publish_status()
+                        await self._engine.run_single_category(name, reset_stats=False)
                 self.logger.info("SCHEDULER", "Scheduled tests completed.")
             elif category:
                 self.stats.reset_category(category)
@@ -176,10 +192,20 @@ class RunManager:
             else:
                 await self._engine.start(mode=self._mode)
         except asyncio.CancelledError:
+            outcome = "stopped by user/controller"
             self.logger.info("SYSTEM", "Test stopped.")
         except Exception as e:
+            outcome = f"error: {type(e).__name__}: {e}"
             self.logger.info("ERROR", f"Test error: {type(e).__name__}: {e}")
         finally:
+            if scheduled_tests is not None:
+                self.logger.info("SCHEDULER", f"Schedule finished: {outcome}; started={began.isoformat()}; "
+                    f"elapsed={(datetime.now(timezone.utc) - began).total_seconds():.1f}s including startup; "
+                    f"next daily run={self.config['scheduler'].get('scheduled_at') if self.config['scheduler'].get('enabled') else 'disabled'}")
+                if self._engine:
+                    self._engine.log_summary("SCHEDULE SUMMARY", outcome)
+                else:
+                    self.logger.info("SCHEDULE SUMMARY", "No tests started; client startup failed or was cancelled.")
             self._phase = "stopping"
             self._publish_status()
             try:
@@ -238,6 +264,12 @@ class RunManager:
                 or any(type(value) is not bool for value in tests.values())):
             raise ValueError("Scheduler tests must contain known tests with boolean switches")
         frequency = data.get("frequency", "once")
+        execution_mode = data.get("execution_mode", "counts")
+        duration_minutes = data.get("duration_minutes", 60)
+        if execution_mode not in ("counts", "duration"):
+            raise ValueError("Execution mode must be counts or duration")
+        if type(duration_minutes) is not int or not 1 <= duration_minutes <= 1440:
+            raise ValueError("Duration must be a whole number from 1 to 1440 minutes")
         run_counts = data.get("run_counts", {})
         if (not isinstance(run_counts, dict) or set(run_counts) - allowed
                 or any(type(count) is not int or not 1 <= count <= 1000 for count in run_counts.values())):
@@ -266,6 +298,7 @@ class RunManager:
             if not any(tests.values()):
                 raise ValueError("Select at least one test")
         schedule = {"enabled": data["enabled"], "scheduled_at": scheduled_at,
+                    "execution_mode": execution_mode, "duration_minutes": duration_minutes,
                     "run_counts": {name: run_counts.get(name, 1) for name in SCHEDULER_DEFAULTS["tests"]},
                     "randomize_order": randomize_order,
                     "frequency": frequency, "daily_time": daily_time, "timezone": zone,
@@ -295,9 +328,10 @@ class RunManager:
                 self.logger.info("SCHEDULER", "Scheduled time reached; waiting for the active test to finish.")
                 self._scheduler_waiting = True
             return  # Wait for the active test; never overlap runs.
+        timed = schedule.get("execution_mode") == "duration"
         tests = [name for name in SCHEDULER_DEFAULTS["tests"] if schedule["tests"].get(name)
-                 for _ in range(schedule.get("run_counts", {}).get(name, 1))]
-        if schedule.get("randomize_order", False):
+                 for _ in range(1 if timed else schedule.get("run_counts", {}).get(name, 1))]
+        if not timed and schedule.get("randomize_order", False):
             random.shuffle(tests)
         # Persist consumption before dispatch so a controller restart cannot repeat it.
         previous = copy.deepcopy(schedule)
@@ -318,7 +352,7 @@ class RunManager:
         self.logger.info("SCHEDULER", f"Starting scheduled tests: {', '.join(tests)}")
         self.broadcast({"type": "scheduler", "data": schedule})
         self._publish_status()
-        self._run_task = asyncio.create_task(self._execute_run(scheduled_tests=tests))
+        self._run_task = asyncio.create_task(self._execute_run(scheduled_tests=tests, scheduled_settings=copy.deepcopy(schedule)))
 
     async def _scheduler_loop(self):
         while True:

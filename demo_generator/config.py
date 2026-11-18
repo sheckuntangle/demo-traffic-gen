@@ -44,6 +44,8 @@ DOCKER_DEFAULTS = {
 
 
 SCHEDULER_DEFAULTS = {
+    "execution_mode": "counts",
+    "duration_minutes": 60,
     "frequency": "once",
     "daily_time": "15:00",
     "timezone": "UTC",

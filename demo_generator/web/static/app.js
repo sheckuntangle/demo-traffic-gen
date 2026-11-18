@@ -397,6 +397,8 @@ const App = {
         const schedule = this.config.scheduler || {enabled: false, tests: {}};
         document.getElementById("scheduler-enabled").checked = !!schedule.enabled;
         document.getElementById("scheduler-randomize").checked = !!schedule.randomize_order;
+        document.getElementById("scheduler-execution-mode").value = schedule.execution_mode || "counts";
+        document.getElementById("scheduler-duration").value = schedule.duration_minutes || 60;
         document.getElementById("scheduler-time").value = this.localDateTime(schedule.scheduled_at);
         document.getElementById("scheduler-frequency").value = schedule.frequency || "once";
         const dailyDisplay = schedule.scheduled_at ? this.localDateTime(schedule.scheduled_at).slice(11) : "15:00";
@@ -409,7 +411,8 @@ const App = {
             `<div class="col"><div class="d-inline-flex align-items-center gap-2 border rounded px-3 py-2"><div class="form-check form-switch mb-0">
                 <input class="form-check-input" type="checkbox" role="switch" id="schedule-${name}" data-schedule-test="${name}" ${schedule.tests[name] ? "checked" : ""}>
                 <label class="form-check-label" for="schedule-${name}">${label}</label>
-            </div><input class="form-control form-control-sm flex-shrink-0" style="width:85px" type="number" min="1" max="1000" step="1" id="schedule-count-${name}" aria-label="${label} run count" value="${Number.isInteger(schedule.run_counts?.[name]) ? schedule.run_counts[name] : 1}"><label class="small text-muted mb-0" for="schedule-count-${name}">runs</label></div></div>`).join("");
+            </div><span data-schedule-count-fields style="display:inline-flex;align-items:center;gap:0.5rem"><input class="form-control form-control-sm flex-shrink-0" style="width:85px" type="number" min="1" max="1000" step="1" id="schedule-count-${name}" aria-label="${label} run count" value="${Number.isInteger(schedule.run_counts?.[name]) ? schedule.run_counts[name] : 1}"><label class="small text-muted mb-0" for="schedule-count-${name}">runs</label></span></div></div>`).join("");
+        this.toggleSchedulerMode();
         const summary = document.getElementById("scheduler-summary");
         summary.textContent = schedule.enabled && schedule.scheduled_at
             ? `Scheduled for ${new Date(schedule.scheduled_at).toLocaleString()} (${zone})`
@@ -427,6 +430,16 @@ const App = {
         const daily = document.getElementById("scheduler-frequency").value === "daily";
         document.getElementById("scheduler-once-fields").hidden = daily;
         document.getElementById("scheduler-daily-fields").hidden = !daily;
+    },
+
+    toggleSchedulerMode() {
+        const timed = document.getElementById("scheduler-execution-mode").value === "duration";
+        document.getElementById("scheduler-duration-fields").hidden = !timed;
+        document.getElementById("scheduler-counts-help").hidden = timed;
+        document.getElementById("scheduler-batch-options").hidden = timed;
+        document.querySelectorAll("[data-schedule-count-fields]").forEach(fields => {
+            fields.style.display = timed ? "none" : "inline-flex";
+        });
     },
 
     toggleScheduler() {
@@ -456,6 +469,12 @@ const App = {
             return;
         }
         const tests = {};
+        const execution_mode = document.getElementById("scheduler-execution-mode")?.value || "counts";
+        const duration_minutes = Number(document.getElementById("scheduler-duration")?.value ?? 60);
+        if (!Number.isInteger(duration_minutes) || duration_minutes < 1 || duration_minutes > 1440) {
+            this.showToast("Duration must be a whole number from 1 to 1440 minutes");
+            return;
+        }
         const run_counts = {};
         document.querySelectorAll("[data-schedule-test]").forEach(input => { tests[input.dataset.scheduleTest] = input.checked; });
         for (const name of Object.keys(tests)) {
@@ -470,7 +489,7 @@ const App = {
         try {
             const res = await fetch("/api/config/scheduler", {
                 method: "PUT", headers: {"Content-Type": "application/json"},
-                body: JSON.stringify({enabled, frequency, daily_time, timezone, scheduled_at: !daily && date ? date.toISOString() : null, tests, run_counts, randomize_order}),
+                body: JSON.stringify({enabled, frequency, daily_time, timezone, scheduled_at: !daily && date ? date.toISOString() : null, tests, run_counts, randomize_order, execution_mode, duration_minutes}),
             });
             const data = await res.json();
             if (!res.ok) { this.showToast(data.detail || "Could not save scheduler"); return; }

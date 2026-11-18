@@ -580,6 +580,8 @@
       "idps": 1,
       "legitimate": 1
     },
-    "randomize_order": false
+    "randomize_order": false,
+    "execution_mode": "counts",
+    "duration_minutes": 60
   }
 }

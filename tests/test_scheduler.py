@@ -6,7 +6,7 @@ import sys
 import tempfile
 from types import SimpleNamespace
 import unittest
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock, Mock, patch
 
 from demo_generator.scheduling import next_daily_run
 from demo_generator.config import load_config
@@ -42,7 +42,7 @@ class SchedulerTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_due_schedule_runs_selected_tests_once_and_blocks_manual_runs(self):
         self.manager.update_scheduler(self.schedule())
-        engine = SimpleNamespace(on=lambda *args: None, run_single_category=AsyncMock(), round_num=0)
+        engine = SimpleNamespace(log_summary=lambda *args: None, on=lambda *args: None, run_single_category=AsyncMock(), round_num=0)
         with patch.object(self.manager, "_get_active_pool", new=AsyncMock()), \
              patch("demo_generator.web.run_manager.Engine", return_value=engine):
             await self.manager._check_schedule(self.when - timedelta(seconds=1))
@@ -71,7 +71,7 @@ class SchedulerTests(unittest.IsolatedAsyncioTestCase):
                 "run_counts": {"app_control": 2, "legitimate": 3, "dns_filter": 7},
                 "randomize_order": randomized})
             self.assertEqual(load_config(self.path)["scheduler"], saved)
-            engine = SimpleNamespace(on=lambda *args: None, run_single_category=AsyncMock(), round_num=0)
+            engine = SimpleNamespace(log_summary=lambda *args: None, on=lambda *args: None, run_single_category=AsyncMock(), round_num=0)
             def interleave(queue):
                 self.assertEqual(queue, ["app_control"] * 2 + ["legitimate"] * 3)
                 queue[:] = ["legitimate", "app_control", "legitimate", "app_control", "legitimate"]
@@ -97,6 +97,49 @@ class SchedulerTests(unittest.IsolatedAsyncioTestCase):
         with self.assertRaises(ValueError):
             self.manager.update_scheduler({**self.schedule(), "randomize_order": "yes"})
 
+    async def test_duration_dispatch_uses_selected_sections_and_interval_settings(self):
+        self.manager.config["generator"].update(round_interval_seconds=300, legitimate_interval_seconds=45, max_rounds=1)
+        self.manager.config["categories"] = {"app_control": {"enabled": False}, "security": {"enabled": True}}
+        saved = self.manager.update_scheduler({**self.schedule(), "execution_mode": "duration",
+            "duration_minutes": 20, "run_counts": {"legitimate": 10}, "randomize_order": True})
+        self.assertEqual(load_config(self.path)["scheduler"], saved)
+        engine = SimpleNamespace(log_summary=lambda *args: None, on=lambda *args: None,
+                                 run_timed=AsyncMock(), run_single_category=AsyncMock(), round_num=0)
+        with patch.object(self.manager, "_get_active_pool", new=AsyncMock()), \
+             patch("demo_generator.web.run_manager.Engine", return_value=engine) as factory, \
+             patch("demo_generator.web.run_manager.random.shuffle") as shuffle:
+            await self.manager._check_schedule(self.when)
+            await self.manager._run_task
+            engine.run_timed.assert_awaited_once_with(1200, ["app_control", "legitimate"])
+            engine.run_single_category.assert_not_awaited()
+            shuffle.assert_not_called()
+            effective = factory.call_args.args[0]
+            self.assertTrue(effective["categories"]["app_control"]["enabled"])
+            self.assertFalse(effective["categories"]["security"]["enabled"])
+            self.assertEqual(effective["generator"]["max_rounds"], 0)
+            self.assertEqual(effective["generator"]["legitimate_interval_seconds"], 45)
+            self.assertEqual(self.manager.config["generator"]["max_rounds"], 1)
+
+    async def test_invalid_duration_settings_rejected(self):
+        for changes in ({"execution_mode": "invalid"}, {"duration_minutes": 0},
+                        {"duration_minutes": 1441}, {"duration_minutes": True},
+                        {"duration_minutes": 1.5}):
+            with self.subTest(changes=changes), self.assertRaises(ValueError):
+                self.manager.update_scheduler({**self.schedule(), **changes})
+
+    async def test_schedule_summary_is_emitted_on_stop_and_error(self):
+        import asyncio
+        for failure, expected in ((asyncio.CancelledError(), "stopped by user/controller"),
+                                  (RuntimeError("worker failed"), "error: RuntimeError: worker failed")):
+            with self.subTest(outcome=expected):
+                engine = SimpleNamespace(log_summary=Mock(), on=lambda *args: None,
+                    run_single_category=AsyncMock(side_effect=failure), round_num=0)
+                with patch.object(self.manager, "_get_active_pool", new=AsyncMock()), \
+                     patch("demo_generator.web.run_manager.Engine", return_value=engine):
+                    await self.manager._execute_run(scheduled_tests=["legitimate"])
+                engine.log_summary.assert_called_once_with("SCHEDULE SUMMARY", expected)
+                self.assertEqual(self.manager.get_status()["phase"], "idle")
+
     async def test_disabled_schedule_never_dispatches(self):
         self.manager.update_scheduler({**self.schedule(), "enabled": False})
         await self.manager._check_schedule(self.when)
@@ -106,7 +149,7 @@ class SchedulerTests(unittest.IsolatedAsyncioTestCase):
         data = {**self.schedule(), "frequency": "daily", "daily_time": "15:00", "timezone": "America/New_York"}
         saved = self.manager.update_scheduler(data)
         due = datetime.fromisoformat(saved["scheduled_at"])
-        engine = SimpleNamespace(on=lambda *args: None, run_single_category=AsyncMock(), round_num=0)
+        engine = SimpleNamespace(log_summary=lambda *args: None, on=lambda *args: None, run_single_category=AsyncMock(), round_num=0)
         with patch.object(self.manager, "_get_active_pool", new=AsyncMock()), \
              patch("demo_generator.web.run_manager.Engine", return_value=engine):
             await self.manager._check_schedule(due)
@@ -124,7 +167,7 @@ class SchedulerTests(unittest.IsolatedAsyncioTestCase):
     async def test_overdue_daily_schedule_runs_once_then_skips_missed_days(self):
         self.manager.update_scheduler({**self.schedule(), "frequency": "daily", "daily_time": "15:00", "timezone": "America/New_York"})
         late = datetime.fromisoformat(self.manager.config["scheduler"]["scheduled_at"]) + timedelta(days=4, hours=1)
-        engine = SimpleNamespace(on=lambda *args: None, run_single_category=AsyncMock(), round_num=0)
+        engine = SimpleNamespace(log_summary=lambda *args: None, on=lambda *args: None, run_single_category=AsyncMock(), round_num=0)
         with patch.object(self.manager, "_get_active_pool", new=AsyncMock()), \
              patch("demo_generator.web.run_manager.Engine", return_value=engine):
             await self.manager._check_schedule(late)
@@ -190,11 +233,18 @@ const elements = {
     'scheduler-time': {value: process.env.LOCAL_TIME},
     'schedule-count-app_control': {value: '5'},
     'scheduler-randomize': {checked: true},
+    'scheduler-execution-mode': {value: 'counts'},
+    'scheduler-duration': {value: '60'},
+    'scheduler-duration-fields': {},
+    'scheduler-counts-help': {},
+    'scheduler-batch-options': {},
 };
+const countFields = [{style: {}}];
 let saved;
 const context = vm.createContext({
     document: {addEventListener() {}, getElementById: id => elements[id],
-        querySelectorAll: () => [{dataset: {scheduleTest: 'app_control'}, checked: true}]},
+        querySelectorAll: selector => selector === '[data-schedule-test]'
+            ? [{dataset: {scheduleTest: 'app_control'}, checked: true}] : countFields},
     fetch: async (url, options) => { saved = JSON.parse(options.body); return {ok: true, json: async () => saved}; },
 });
 vm.runInContext(fs.readFileSync('demo_generator/web/static/app.js', 'utf8') + '\n globalThis.app = App;', context);
@@ -220,6 +270,19 @@ app.showToast = () => {};
     await app.saveScheduler();
     assert.equal(saved.daily_time, '12:30');
     assert.equal(saved.timezone, process.env.TZ);
+    elements['scheduler-execution-mode'].value = 'duration';
+    elements['scheduler-duration'].value = '90';
+    app.toggleSchedulerMode();
+    assert.equal(elements['scheduler-duration-fields'].hidden, false);
+    assert.equal(elements['scheduler-batch-options'].hidden, true);
+    assert.equal(countFields[0].style.display, 'none');
+    await app.saveScheduler();
+    assert.equal(saved.execution_mode, 'duration');
+    assert.equal(saved.duration_minutes, 90);
+    elements['scheduler-execution-mode'].value = 'counts';
+    app.toggleSchedulerMode();
+    assert.equal(elements['scheduler-duration-fields'].hidden, true);
+    assert.equal(countFields[0].style.display, 'inline-flex');
 })().catch(error => { console.error(error); process.exitCode = 1; });
 '''
         root = Path(__file__).resolve().parents[1]

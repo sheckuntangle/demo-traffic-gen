@@ -24,7 +24,7 @@ WORKER_PORT = 8090
 WORKER_PLAYWRIGHT_VERSION = "1.62.0"
 WORKER_VERSION_LABEL = "org.demo-generator.playwright-version"
 WORKER_PROTOCOL_LABEL = "org.demo-generator.worker-protocol"
-WORKER_PROTOCOL_VERSION = "2"
+WORKER_PROTOCOL_VERSION = "3"
 
 
 @dataclass
@@ -417,7 +417,7 @@ class DockerClientPool:
                           f"(Playwright label={version!r}, required={WORKER_PLAYWRIGHT_VERSION}); rebuilding")
                 return False
             if (image.labels or {}).get(WORKER_PROTOCOL_LABEL) != WORKER_PROTOCOL_VERSION:
-                self._log(f"Worker image '{image_name}' predates live result streaming; rebuilding")
+                self._log(f"Worker image '{image_name}' requires worker protocol {WORKER_PROTOCOL_VERSION}; rebuilding")
                 return False
             return True
         except ImageNotFound:

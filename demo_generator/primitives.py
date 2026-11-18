@@ -44,6 +44,7 @@ def apply_expected(result, expected):
 
 async def ping(ip, name="", source_ip=None, timeout=5):
     start = time.monotonic()
+    proc = None
     cmd = ["ping", "-c", "1", "-W", "2"]
     if source_ip:
         cmd.extend(["-I", source_ip])
@@ -69,6 +70,13 @@ async def ping(ip, name="", source_ip=None, timeout=5):
         elapsed = (time.monotonic() - start) * 1000
         label = f"{name} ({ip})" if name else ip
         return TestResult("PING", label, False, message=str(e)[:80], duration_ms=elapsed)
+    finally:
+        if proc is not None and proc.returncode is None:
+            try:
+                proc.kill()
+            except ProcessLookupError:
+                pass
+            await proc.communicate()
 
 
 async def dns_query(domain):

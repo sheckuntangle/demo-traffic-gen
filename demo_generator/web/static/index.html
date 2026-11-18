@@ -158,13 +158,25 @@
                             <input class="form-control mb-1" style="max-width:340px" type="time" id="scheduler-daily-time" step="60">
                         </div>
                         <p class="text-muted small" id="scheduler-timezone"></p>
-                        <p class="text-muted small">Choose sections and the number of runs per scheduled execution (1–1000). Each run selects a client and samples traffic again.</p>
+                        <label class="form-label" for="scheduler-execution-mode">Run behavior</label>
+                        <select class="form-select mb-3" style="max-width:400px" id="scheduler-execution-mode" onchange="App.toggleSchedulerMode()">
+                            <option value="counts">Run each section a fixed number of times</option>
+                            <option value="duration">Run generator for a duration using intervals</option>
+                        </select>
+                        <div id="scheduler-duration-fields" hidden>
+                            <label class="form-label" for="scheduler-duration">Duration (minutes)</label>
+                            <input class="form-control mb-2" style="max-width:180px" type="number" id="scheduler-duration" min="1" max="1440" step="1" value="60">
+                            <p class="text-muted small">Runs the checked sections only. Legitimate traffic starts immediately; trigger rounds start after the Generator Settings trigger interval. Both loops repeat concurrently using their configured intervals. The duration starts after client startup and stops in-flight tests when it expires. Run counts, shuffle, and Max Rounds do not apply.</p>
+                        </div>
+                        <p class="text-muted small" id="scheduler-counts-help">Choose sections and the number of runs per scheduled execution (1–1000). Each run selects a client and samples traffic again.</p>
                         <div class="row row-cols-1 row-cols-lg-2 g-2 mb-3" id="scheduler-tests"></div>
+                        <div id="scheduler-batch-options">
                         <div class="form-check mb-2">
                             <input class="form-check-input" type="checkbox" id="scheduler-randomize">
                             <label class="form-check-label" for="scheduler-randomize">Randomize run order</label>
                         </div>
                         <p class="text-muted small">Mix individual runs across enabled sections. With this off, each section completes all its runs in order.</p>
+                        </div>
                     </fieldset>
                     <p class="small" id="scheduler-summary" aria-live="polite"></p>
                     <button class="btn btn-primary btn-sm" onclick="App.saveScheduler()">Save Scheduler</button>
@@ -184,6 +196,6 @@
 </div>
 
 <script src="/static/bootstrap.bundle.min.js"></script>
-<script src="/static/app.js?v=16"></script>
+<script src="/static/app.js?v=17"></script>
 </body>
 </html>
