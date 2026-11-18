@@ -133,8 +133,10 @@ class SharedRunsTests(unittest.IsolatedAsyncioTestCase):
         summary_index = next(i for i, entry in enumerate(entries) if entry["category"] == "RUN SUMMARY")
         self.assertLess(cleanup_index, summary_index)
         summary = "\n".join(entry["message"] for entry in entries if entry["category"] == "RUN SUMMARY")
-        for text in ("stopped by user/controller", "client-50", "192.168.77.50", "legitimate", "1 passed", "1 cancelled"):
+        for text in ("stopped by user/controller", "client-50", "192.168.77.50", "Legitimate Traffic", "1 passed", "1 cancelled"):
             self.assertIn(text, summary)
+        report = next(entry["report"] for entry in entries if entry["test_type"] == "SUMMARY")
+        self.assertEqual(report["clients"][0]["sections"][0]["category"], "legitimate")
         self.assertFalse(self.manager.get_status()["running"])
 
     async def test_invalid_manual_counts_do_not_reserve_runner(self):
@@ -182,6 +184,16 @@ class SharedRunsTests(unittest.IsolatedAsyncioTestCase):
         self.manager = RunManager(self.config, self.directory.name + "/config.json")
         self.assertEqual(self.manager.get_log_history()[-1]["message"], "Saved history")
         self.assertFalse(self.manager.get_status()["running"])
+
+    async def test_structured_summary_survives_restart(self):
+        report = {"outcome": "completed", "totals": {"passed": 3}, "clients": []}
+        self.manager.logger.summary("RUN SUMMARY", report, "Summary\n3 passed")
+        await self.manager.cleanup()
+        self.manager = RunManager(self.config, self.directory.name + "/config.json")
+        entry = self.manager.get_log_history()[-1]
+        self.assertEqual(entry["test_type"], "SUMMARY")
+        self.assertEqual(entry["report"], report)
+        self.assertEqual(entry["message"], "Summary\n3 passed")
 
     async def test_legacy_history_gets_controller_timezone_before_replay(self):
         await self.manager.cleanup()

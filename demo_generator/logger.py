@@ -124,6 +124,16 @@ class Logger:
             "round_num": 0,
         })
 
+    def summary(self, label, report, text):
+        """Publish one structured report, with a readable text version for files/copy."""
+        timestamp = datetime.now().astimezone().isoformat(timespec="seconds")
+        if not self._quiet:
+            print(f"\n{text}\n")
+        self._file_logger.info(f"[{timestamp}] {label}\n{text}")
+        self._emit({"timestamp": timestamp, "category": label, "test_type": "SUMMARY",
+                    "target": "", "status": "INFO", "message": text, "report": report,
+                    "client_name": "", "round_num": 0})
+
     def print_summary(self, stats):
         summary = stats.get_cumulative()
         total_pass = summary["total_pass"]

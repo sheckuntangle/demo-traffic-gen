@@ -31,8 +31,12 @@ class EngineSummaryTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual((record["passed"], record["failed"], record["status"]), (1, 1, "completed"))
         self.assertEqual(record["source_ip"], "192.168.77.50")
         engine.log_summary("SCHEDULE SUMMARY", "completed")
-        messages = "\n".join(call.args[1] for call in engine._logger.info.call_args_list)
-        for text in ("client-50", "192.168.77.50", "app_control", "1 passed, 1 failed", "Timeout", "execution="):
+        report = engine._logger.summary.call_args.args[1]
+        self.assertEqual(report["totals"]["passed"], 1)
+        self.assertEqual(report["totals"]["failed"], 1)
+        self.assertEqual(report["clients"][0]["sections"][0]["category"], "app_control")
+        messages = "\n".join(call.args[1] for call in engine._logger.info.call_args_list) + engine._logger.summary.call_args.args[2]
+        for text in ("client-50", "192.168.77.50", "App Control", "1 passed, 1 failed", "Timeout", "execution="):
             self.assertIn(text, messages)
         self.assertEqual(engine._logger.log_result.call_count, 3)  # No duplicate returned results.
         self.assertEqual(engine._stats.get_cumulative()["total_pass"], 1)

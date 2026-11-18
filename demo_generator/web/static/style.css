@@ -46,6 +46,41 @@ body { background: #1a1d23; color: #e0e0e0; }
 #log-panel .log-line { white-space: nowrap; }
 #log-panel .log-separator { color: #444; margin-top: 4px; }
 
+.run-report {
+    margin: 16px 0;
+    padding: 20px;
+    border: 1px solid #3a4657;
+    border-radius: 10px;
+    background: #171f2b;
+    font: 14px/1.5 system-ui, sans-serif;
+    white-space: normal;
+    overflow-wrap: anywhere;
+}
+.report-heading { display: flex; justify-content: space-between; align-items: baseline; flex-wrap: wrap; gap: 8px; }
+.report-heading h3 { margin: 0; font-size: 20px; }
+.report-heading time, .report-muted, .report-hint, .report-note { color: #a4afbf; }
+.report-heading time { font-size: 12px; }
+.report-outcome { text-transform: capitalize; margin: 6px 0 16px; }
+.report-metrics { display: grid; grid-template-columns: repeat(auto-fit, minmax(105px, 1fr)); gap: 8px; margin-bottom: 16px; }
+.report-metric { padding: 12px; background: #0d141e; border-radius: 6px; }
+.report-metric strong, .report-metric span { display: block; }
+.report-metric strong { font-size: 24px; font-variant-numeric: tabular-nums; }
+.report-metric span { color: #a4afbf; font-size: 12px; }
+.report-warning { color: #e3b341; }
+.report-hint, .report-note { font-size: 12px; }
+.report-note { margin: 14px 0 0; }
+.report-client { border-top: 1px solid #344052; }
+.report-client summary { padding: 12px 0; cursor: pointer; }
+.report-client-name { font-weight: 600; margin-right: 12px; }
+.report-client-totals { display: inline-block; font-size: 12px; margin-left: 8px; }
+.report-table-scroll { overflow-x: auto; margin-bottom: 12px; }
+.report-table { width: 100%; border-collapse: collapse; font-size: 12px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.report-table th, .report-table td { padding: 8px 10px; text-align: right; border-bottom: 1px solid #293547; }
+.report-table th:first-child { text-align: left; }
+.report-table thead th { color: #a4afbf; font-weight: 500; }
+.report-table tbody th { font-weight: 500; }
+.report-table tbody tr:hover { background: #212d3e; }
+
 .stat-card { }
 .stat-card .pass-count { color: #3fb950; font-size: 1.5rem; font-weight: bold; }
 .stat-card .fail-count { color: #f85149; font-size: 1.5rem; font-weight: bold; }

@@ -403,20 +403,33 @@ class Engine:
         groups = defaultdict(list)
         for activity in self._activity:
             groups[(activity["client"], activity["source_ip"], activity["category"])].append(activity)
-        self._logger.info(label, f"Run summary: {outcome}; {len(self._activity)} section/client executions; "
-                          f"{len({a['client'] for a in self._activity})} clients used; "
-                          f"{sum(a['passed'] for a in self._activity)} passed, "
-                          f"{sum(a['failed'] for a in self._activity)} failed checks; "
-                          f"{sum(a['status'] == 'cancelled' for a in self._activity)} cancelled executions. "
-                          "Pass/fail reflects configured policy expectations; phase announcements excluded.")
+        totals = {"executions": len(self._activity), "clients": len({a['client'] for a in self._activity}),
+                  "passed": sum(a["passed"] for a in self._activity), "failed": sum(a["failed"] for a in self._activity),
+                  "cancelled": sum(a["status"] == "cancelled" for a in self._activity),
+                  "errors": sum(a["status"] == "error" for a in self._activity)}
+        clients = {}
+        text = [label, "=" * 78, f"Outcome: {outcome}",
+                f"{totals['clients']} clients | {totals['executions']} section runs | "
+                f"{totals['passed']} passed, {totals['failed']} failed | {totals['cancelled']} cancelled | {totals['errors']} errors"]
+        categories = get_all_categories()
         for (client, source, category), entries in sorted(groups.items()):
-            self._logger.info(label, f"[{client}] source={source}; {category}: {len(entries)} executions; "
-                f"{sum(a['passed'] for a in entries)} passed, {sum(a['failed'] for a in entries)} failed; "
-                f"{sum(a['status'] == 'cancelled' for a in entries)} cancelled, "
-                f"{sum(a['status'] == 'error' for a in entries)} errors; "
-                f"elapsed total={sum(a['seconds'] for a in entries):.1f}s")
+            key = (client, source)
+            if key not in clients:
+                clients[key] = {"name": client, "source_ip": source, "sections": []}
+                text.extend(["", f"CLIENT {client}" + (f"  |  source {source}" if source != client else ""),
+                             f"{'Section':<24} {'Runs':>5} {'Pass':>6} {'Fail':>6} {'Cancel':>7} {'Errors':>7} {'Time':>8}"])
+            section = {"category": category, "label": categories[category].display_name if category in categories else category,
+                       "executions": len(entries), "passed": sum(a['passed'] for a in entries),
+                       "failed": sum(a['failed'] for a in entries), "cancelled": sum(a['status'] == 'cancelled' for a in entries),
+                       "errors": sum(a['status'] == 'error' for a in entries), "seconds": round(sum(a['seconds'] for a in entries), 1)}
+            clients[key]["sections"].append(section)
+            text.append(f"{section['label']:<24} {section['executions']:>5} {section['passed']:>6} {section['failed']:>6} "
+                        f"{section['cancelled']:>7} {section['errors']:>7} {section['seconds']:>7.1f}s")
         if not groups:
-            self._logger.info(label, "No section/client executions started. Check startup errors and the duration versus trigger interval.")
+            text.append("No tests started. Check startup errors and the duration versus trigger interval.")
+        note = "Pass/fail reflects configured policy expectations. Phase announcements excluded. Time is summed test time; concurrent tests overlap."
+        text.extend(["", note])
+        self._logger.summary(label, {"outcome": outcome, "totals": totals, "clients": list(clients.values()), "note": note}, "\n".join(text))
 
     # --- Single-category run (for "Run Now" from GUI) ---
 

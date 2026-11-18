@@ -253,7 +253,13 @@ const App = {
     renderLogEntry(entry, container) {
         const div = document.createElement("div");
 
-        if (entry.test_type === "SEPARATOR") {
+        if (entry.test_type === "SUMMARY" && entry.report) {
+            div.className = "run-report";
+            div.dataset.copyText = `${this.localLogTimestamp(entry.timestamp)}\n${entry.message}`;
+            div.innerHTML = this.renderRunReport(entry);
+            container.appendChild(div);
+            this.logCount++;
+        } else if (entry.test_type === "SEPARATOR") {
             div.className = "log-separator";
             const label = entry.message ? ` ${this.esc(entry.message)} ` : "";
             div.innerHTML = `<span class="text-muted">${"─".repeat(40)}${label}${"─".repeat(Math.max(0, 40 - label.length))}</span>`;
@@ -277,9 +283,46 @@ const App = {
 
     },
 
+    renderRunReport(entry) {
+        const report = entry.report;
+        const esc = value => this.esc(String(value ?? ""));
+        const totals = report.totals;
+        const metric = (label, value, className = "") =>
+            `<div class="report-metric ${className}"><strong>${esc(value)}</strong><span>${label}</span></div>`;
+        const clients = report.clients.map(client => {
+            const sum = key => client.sections.reduce((total, section) => total + section[key], 0);
+            const rows = client.sections.map(section => `<tr>
+                <th scope="row">${esc(section.label)}</th><td>${esc(section.executions)}</td>
+                <td class="log-pass">${esc(section.passed)}</td>
+                <td class="${section.failed ? "log-fail" : "report-muted"}">${esc(section.failed)}</td>
+                <td class="${section.cancelled ? "report-warning" : "report-muted"}">${esc(section.cancelled)}</td>
+                <td class="${section.errors ? "log-fail" : "report-muted"}">${esc(section.errors)}</td>
+                <td>${esc(this.reportDuration(section.seconds))}</td></tr>`).join("");
+            return `<details class="report-client"><summary>
+                <span class="report-client-name">${esc(client.name)}</span>
+                ${client.source_ip !== client.name ? `<span class="report-muted">Source: ${esc(client.source_ip)}</span>` : ""}
+                <span class="report-client-totals">${esc(sum("executions"))} runs · <span class="log-pass">${esc(sum("passed"))} passed</span> · <span class="${sum("failed") ? "log-fail" : "report-muted"}">${esc(sum("failed"))} failed</span>${sum("cancelled") ? ` · <span class="report-warning">${esc(sum("cancelled"))} cancelled</span>` : ""}${sum("errors") ? ` · <span class="log-fail">${esc(sum("errors"))} errors</span>` : ""}</span>
+                </summary><div class="report-table-scroll"><table class="report-table">
+                <thead><tr><th scope="col">Test section</th><th scope="col">Runs</th><th scope="col">Passed</th><th scope="col">Failed</th><th scope="col">Cancelled</th><th scope="col">Errors</th><th scope="col">Total time</th></tr></thead>
+                <tbody>${rows}</tbody></table></div></details>`;
+        }).join("");
+        return `<div class="report-heading"><h3>${entry.category === "SCHEDULE SUMMARY" ? "Schedule summary" : "Run summary"}</h3><time>${esc(this.localLogTimestamp(entry.timestamp))}</time></div>
+            <p class="report-outcome">${esc(report.outcome)}</p><div class="report-metrics">
+            ${metric("Clients", totals.clients)}${metric("Section runs", totals.executions)}
+            ${metric("Passed checks", totals.passed, "log-pass")}${metric("Failed checks", totals.failed, totals.failed ? "log-fail" : "")}
+            ${metric("Cancelled runs", totals.cancelled, totals.cancelled ? "report-warning" : "")}${metric("Errors", totals.errors, totals.errors ? "log-fail" : "")}
+            </div><p class="report-hint">Select a client to see its test sections.</p>${clients || '<p>No tests started. Check startup errors and the duration versus trigger interval.</p>'}
+            <p class="report-note">${esc(report.note)}</p>`;
+    },
+
+    reportDuration(seconds) {
+        const rounded = Math.round(seconds);
+        return seconds >= 60 ? `${Math.floor(rounded / 60)}m ${rounded % 60}s` : `${seconds.toFixed(1)}s`;
+    },
+
     copyLog() {
         const panel = document.getElementById("log-panel");
-        const text = panel.innerText;
+        const text = Array.from(panel.children).map(node => node.dataset?.copyText ?? node.innerText ?? "").join("\n");
         if (navigator.clipboard && navigator.clipboard.writeText) {
             navigator.clipboard.writeText(text).then(
                 () => this.showToast("Logs copied to clipboard"),
