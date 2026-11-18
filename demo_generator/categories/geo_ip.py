@@ -21,12 +21,14 @@ class GeoIp(TestCategory):
                 result = await ping(target["ip"], desc, source_ip=source_ip)
                 result.category = self.name
                 apply_expected(result, expected)
+                self.emit_result(result)
                 results.append(result)
                 await _delay()
 
                 result = await tcp_connect(target["ip"], 443, timeout=3)
                 result.category = self.name
                 apply_expected(result, expected)
+                self.emit_result(result)
                 results.append(result)
                 await _delay()
 

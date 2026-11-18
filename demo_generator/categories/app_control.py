@@ -17,6 +17,7 @@ class AppControl(TestCategory):
             result = await ssh_connect(target["host"], target.get("port", 22))
             result.category = self.name
             apply_expected(result, target.get("expected", ""))
+            self.emit_result(result)
             results.append(result)
             await _human_delay()
 
@@ -25,6 +26,7 @@ class AppControl(TestCategory):
             result = await web_request(target["url"], context)
             result.category = self.name
             apply_expected(result, target.get("expected", ""))
+            self.emit_result(result)
             results.append(result)
             await _human_delay()
 

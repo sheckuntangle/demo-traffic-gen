@@ -6,6 +6,7 @@ from unittest.mock import Mock, patch
 
 from demo_generator.docker_clients import (
     DockerClientPool, WORKER_PLAYWRIGHT_VERSION, WORKER_VERSION_LABEL,
+    WORKER_PROTOCOL_LABEL, WORKER_PROTOCOL_VERSION,
 )
 
 
@@ -26,7 +27,9 @@ class PlaywrightVersionTests(unittest.TestCase):
             pass
         with patch.dict("sys.modules", {"docker.errors": SimpleNamespace(ImageNotFound=ImageNotFound)}):
             for labels, expected in (({}, False), ({WORKER_VERSION_LABEL: "1.65.0"}, False),
-                                     ({WORKER_VERSION_LABEL: WORKER_PLAYWRIGHT_VERSION}, True)):
+                                     ({WORKER_VERSION_LABEL: WORKER_PLAYWRIGHT_VERSION}, False),
+                                     ({WORKER_VERSION_LABEL: WORKER_PLAYWRIGHT_VERSION,
+                                       WORKER_PROTOCOL_LABEL: WORKER_PROTOCOL_VERSION}, True)):
                 pool._docker.images.get.return_value = SimpleNamespace(labels=labels)
                 self.assertEqual(pool.image_exists(), expected)
             pool._docker.images.get.side_effect = ImageNotFound()

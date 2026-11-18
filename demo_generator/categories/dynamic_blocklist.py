@@ -19,12 +19,14 @@ class DynamicBlocklist(TestCategory):
             result = await ping(target["ip"], target.get("description", ""), source_ip=source_ip)
             result.category = self.name
             apply_expected(result, expected)
+            self.emit_result(result)
             results.append(result)
             await _delay()
 
             result = await tcp_connect(target["ip"], 80)
             result.category = self.name
             apply_expected(result, expected)
+            self.emit_result(result)
             results.append(result)
             await _delay()
 
@@ -34,12 +36,14 @@ class DynamicBlocklist(TestCategory):
             result = await ping(target["domain"], target.get("description", ""), source_ip=source_ip)
             result.category = self.name
             apply_expected(result, expected)
+            self.emit_result(result)
             results.append(result)
             await _delay()
 
             result = await dns_query(target["domain"])
             result.category = self.name
             apply_expected(result, expected)
+            self.emit_result(result)
             results.append(result)
             await _delay()
 
@@ -48,6 +52,7 @@ class DynamicBlocklist(TestCategory):
             result = await web_request(url, context)
             result.category = self.name
             apply_expected(result, expected)
+            self.emit_result(result)
             results.append(result)
             await _delay()
 

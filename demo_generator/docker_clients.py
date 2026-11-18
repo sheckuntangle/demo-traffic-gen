@@ -2,6 +2,7 @@
 
 import asyncio
 import logging
+import json
 import random
 import time
 from dataclasses import dataclass
@@ -22,6 +23,8 @@ CONTAINER_PREFIX = "demogen-client-"
 WORKER_PORT = 8090
 WORKER_PLAYWRIGHT_VERSION = "1.62.0"
 WORKER_VERSION_LABEL = "org.demo-generator.playwright-version"
+WORKER_PROTOCOL_LABEL = "org.demo-generator.worker-protocol"
+WORKER_PROTOCOL_VERSION = "2"
 
 
 @dataclass
@@ -40,14 +43,29 @@ class DockerClient:
     async def run_category(self, category, config):
         import aiohttp
         url = f"{self.base_url}/run"
-        payload = {"category": category.name, "config": config}
+        payload = {"category": category.name, "config": config, "stream": True}
         async with aiohttp.ClientSession() as session:
             async with session.post(url, json=payload, timeout=aiohttp.ClientTimeout(total=600)) as resp:
                 if resp.status != 200:
                     detail = await resp.text()
                     raise RuntimeError(f"Worker error ({resp.status}): {detail}")
-                data = await resp.json()
-                return [TestResult.from_dict(d) for d in data]
+                if resp.content_type != "application/x-ndjson":
+                    data = await resp.json()
+                    return [TestResult.from_dict(d) for d in data]
+                results = []
+                async for line in resp.content:
+                    if not line.strip():
+                        continue
+                    event = json.loads(line)
+                    if event["type"] == "result":
+                        result = TestResult.from_dict(event["data"])
+                        category.emit_result(result)
+                        results.append(result)
+                    elif event["type"] == "error":
+                        raise RuntimeError(f"Worker error: {event['detail']}")
+                    elif event["type"] == "done":
+                        return results
+                raise RuntimeError("Worker stream ended before the category completed")
 
     async def recycle(self):
         import aiohttp
@@ -397,6 +415,9 @@ class DockerClientPool:
             if version != WORKER_PLAYWRIGHT_VERSION:
                 self._log(f"Worker image '{image_name}' is incompatible or predates version tracking "
                           f"(Playwright label={version!r}, required={WORKER_PLAYWRIGHT_VERSION}); rebuilding")
+                return False
+            if (image.labels or {}).get(WORKER_PROTOCOL_LABEL) != WORKER_PROTOCOL_VERSION:
+                self._log(f"Worker image '{image_name}' predates live result streaming; rebuilding")
                 return False
             return True
         except ImageNotFound:

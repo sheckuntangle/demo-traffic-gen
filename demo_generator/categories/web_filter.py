@@ -22,6 +22,7 @@ class WebFilter(TestCategory):
             result = await web_request(target["url"], context)
             result.category = self.name
             apply_expected(result, target.get("expected", ""))
+            self.emit_result(result)
             results.append(result)
             await _human_delay()
 

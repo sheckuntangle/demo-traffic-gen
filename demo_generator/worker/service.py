@@ -1,5 +1,7 @@
 """Worker service that runs inside each Docker container."""
 
+import asyncio
+import json
 import logging
 import os
 import socket
@@ -8,7 +10,7 @@ import traceback
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, StreamingResponse
 from pydantic import BaseModel
 
 from ..clients import (
@@ -20,6 +22,41 @@ from ..categories import get_all_categories
 from ..primitives import TestResult
 
 logger = logging.getLogger("demo_generator.worker")
+
+
+async def stream_category(category, context, config):
+    queue = asyncio.Queue()
+    emitted = []
+
+    def on_result(result):
+        emitted.append(result)
+        queue.put_nowait({"type": "result", "data": result.to_dict()})
+
+    async def execute():
+        category._on_result = on_result
+        try:
+            results = await category.run(context, config)
+            emitted_ids = {id(result) for result in emitted}
+            for result in results:
+                if id(result) not in emitted_ids:
+                    on_result(result)
+            queue.put_nowait({"type": "done"})
+        except Exception as exc:
+            logger.exception("Category %s failed", category.name)
+            queue.put_nowait({"type": "error", "detail": str(exc)})
+        finally:
+            category._on_result = None
+
+    task = asyncio.create_task(execute())
+    try:
+        while True:
+            event = await queue.get()
+            yield json.dumps(event) + "\n"
+            if event["type"] in ("done", "error"):
+                break
+    finally:
+        task.cancel()
+        await asyncio.gather(task, return_exceptions=True)
 
 
 def _get_container_ip():
@@ -115,6 +152,7 @@ def create_app():
     class RunRequest(BaseModel):
         category: str
         config: dict
+        stream: bool = False
 
     @app.post("/run")
     async def run_category(req: RunRequest):
@@ -122,6 +160,12 @@ def create_app():
         cat_cls = all_categories.get(req.category)
         if not cat_cls:
             return JSONResponse(status_code=400, content={"detail": f"Unknown category: {req.category}"})
+
+        if req.stream:
+            return StreamingResponse(
+                stream_category(cat_cls(), state.browser_context, req.config),
+                media_type="application/x-ndjson",
+            )
 
         try:
             category = cat_cls()
