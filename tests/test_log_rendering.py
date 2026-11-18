@@ -1,11 +1,40 @@
 """Exercise log batching and retention using the browser controller in Node."""
 
 from pathlib import Path
+import os
 import subprocess
 import unittest
 
 
 class LogRenderingTests(unittest.TestCase):
+    def test_timestamps_follow_browser_timezone_and_daylight_saving(self):
+        script = r'''
+const assert = require('assert');
+const fs = require('fs');
+const vm = require('vm');
+const context = vm.createContext({document: {addEventListener() {}}});
+vm.runInContext(fs.readFileSync('demo_generator/web/static/app.js', 'utf8') + '\nglobalThis.app = App;', context);
+const format = value => context.app.localLogTimestamp(value);
+const expected = JSON.parse(process.env.EXPECTED);
+assert.equal(format('2026-11-18T18:39:00+00:00'), expected[0]);
+assert.equal(format('2026-07-18T18:39:00Z'), expected[1]);
+assert.equal(format('2026-11-18T23:39:00+05:00'), expected[0]);
+assert.equal(format(''), '');
+assert.equal(format(undefined), '');
+assert.equal(format('invalid'), 'invalid');
+'''
+        import json
+        for zone, expected in (
+            ("America/New_York", ["2026-11-18 13:39:00", "2026-07-18 14:39:00"]),
+            ("Europe/Bucharest", ["2026-11-18 20:39:00", "2026-07-18 21:39:00"]),
+        ):
+            with self.subTest(zone=zone):
+                subprocess.run(
+                    ["node", "-e", script], cwd=Path(__file__).resolve().parents[1],
+                    env={**os.environ, "TZ": zone, "EXPECTED": json.dumps(expected)},
+                    check=True, capture_output=True, text=True,
+                )
+
     def test_history_yields_batches_preserves_order_and_cancels_on_clear(self):
         script = r'''
 const assert = require('assert');

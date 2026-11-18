@@ -1,4 +1,7 @@
 import asyncio
+from datetime import datetime
+import json
+from pathlib import Path
 import tempfile
 import unittest
 from types import SimpleNamespace
@@ -102,10 +105,24 @@ class SharedRunsTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_history_survives_manager_restart(self):
         self.manager.logger.info("SYSTEM", "Saved history")
+        stamp = self.manager.get_log_history()[-1]["timestamp"]
+        self.assertIsNotNone(datetime.fromisoformat(stamp).utcoffset())
+        self.manager.logger.log_result("legitimate", "DNS", "example.com", "PASS")
+        self.assertIsNotNone(datetime.fromisoformat(self.manager.get_log_history()[-1]["timestamp"]).utcoffset())
+        self.manager.logger.info("SYSTEM", "Saved history")
         await self.manager.cleanup()
         self.manager = RunManager(self.config, self.directory.name + "/config.json")
         self.assertEqual(self.manager.get_log_history()[-1]["message"], "Saved history")
         self.assertFalse(self.manager.get_status()["running"])
+
+    async def test_legacy_history_gets_controller_timezone_before_replay(self):
+        await self.manager.cleanup()
+        path = Path(self.directory.name) / "web_history.jsonl"
+        path.write_text(json.dumps({"timestamp": "2026-11-18 18:39:00", "message": "Legacy"}) + "\n")
+        self.manager = RunManager(self.config, self.directory.name + "/config.json")
+        stamp = self.manager.get_log_history()[-1]["timestamp"]
+        expected = datetime(2026, 11, 18, 18, 39).astimezone()
+        self.assertEqual(datetime.fromisoformat(stamp), expected)
 
 
 if __name__ == "__main__":

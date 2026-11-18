@@ -55,6 +55,14 @@ class RunManager:
                         try:
                             entry = json.loads(line)
                             if isinstance(entry, dict):
+                                # Older history used the controller's local wall time
+                                # without an offset. Attach its timezone before replay.
+                                if entry.get("timestamp"):
+                                    try:
+                                        stamp = datetime.fromisoformat(entry["timestamp"])
+                                        entry["timestamp"] = stamp.astimezone().isoformat(timespec="seconds")
+                                    except (ValueError, TypeError):
+                                        pass
                                 self._history.append(entry)
                         except ValueError:
                             pass

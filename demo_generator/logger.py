@@ -60,7 +60,8 @@ class Logger:
                 pass
 
     def log_result(self, category, test_type, target, status, message="", client_name="", round_num=0):
-        timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        now = datetime.now().astimezone()
+        timestamp = now.strftime("%Y-%m-%d %H:%M:%S")
         color = STATUS_COLORS.get(status, RESET)
 
         console_line = (
@@ -78,7 +79,7 @@ class Logger:
         self._file_logger.info(file_line)
 
         entry = {
-            "timestamp": timestamp,
+            "timestamp": now.isoformat(timespec="seconds"),
             "category": category,
             "test_type": test_type,
             "target": target,
@@ -106,13 +107,14 @@ class Logger:
         })
 
     def info(self, category, message):
-        timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        now = datetime.now().astimezone()
+        timestamp = now.strftime("%Y-%m-%d %H:%M:%S")
         if not self._quiet:
             console_line = f"[{timestamp}] {YELLOW}>>> {message}{RESET}"
             print(console_line)
         self._file_logger.info(f"[{timestamp}] >>> {message}")
         self._emit({
-            "timestamp": timestamp,
+            "timestamp": now.isoformat(timespec="seconds"),
             "category": category,
             "test_type": "INFO",
             "target": "",

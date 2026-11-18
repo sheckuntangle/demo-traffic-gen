@@ -232,6 +232,14 @@ const App = {
         }
     },
 
+    localLogTimestamp(timestamp) {
+        if (!timestamp) return "";
+        const date = new Date(timestamp);
+        if (!Number.isFinite(date.getTime())) return timestamp;
+        const pad = value => String(value).padStart(2, "0");
+        return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`;
+    },
+
     renderLogEntry(entry, container) {
         const div = document.createElement("div");
 
@@ -246,7 +254,7 @@ const App = {
             div.className = "log-line";
             const statusClass = entry.status === "PASS" ? "log-pass" : entry.status === "FAIL" ? "log-fail" : "log-info";
             const client = entry.client_name ? `[${entry.client_name}] ` : "";
-            const ts = entry.timestamp || "";
+            const ts = this.localLogTimestamp(entry.timestamp);
             div.innerHTML = `<span class="text-muted">${this.esc(ts)}</span> `
                 + `<span class="log-info">${this.esc(client)}</span>`
                 + `<span class="log-info">${this.esc(entry.category || "")}</span> | `
