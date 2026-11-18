@@ -56,20 +56,29 @@ async def ping(ip, name="", source_ip=None, timeout=5):
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
         )
-        await asyncio.wait_for(proc.communicate(), timeout=timeout)
+        stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=timeout)
         elapsed = (time.monotonic() - start) * 1000
         label = f"{name} ({ip})" if name else ip
+        output = (stdout + b"\n" + stderr).decode(errors="replace")
+        details = "; ".join(line.strip() for line in output.splitlines()
+                            if line.strip() and not line.startswith(("PING ", "--- ")))[:500]
         if proc.returncode == 0:
-            return TestResult("PING", label, True, duration_ms=elapsed)
-        return TestResult("PING", label, False, message="No response", duration_ms=elapsed)
+            message = "ICMP echo reply received (host responded)."
+            if details:
+                message += f" {details}"
+            return TestResult("PING", label, True, message=message, duration_ms=elapsed)
+        message = (f"No ICMP echo reply (exit code {proc.returncode})." if proc.returncode == 1
+                   else f"Ping command failed (exit code {proc.returncode}).")
+        message += f" {details}" if details else " No diagnostic output returned."
+        return TestResult("PING", label, False, message=message, duration_ms=elapsed)
     except asyncio.TimeoutError:
         elapsed = (time.monotonic() - start) * 1000
         label = f"{name} ({ip})" if name else ip
-        return TestResult("PING", label, False, message="Timeout", duration_ms=elapsed)
+        return TestResult("PING", label, False, message=f"Ping timed out after {timeout:g}s without completing.", duration_ms=elapsed)
     except Exception as e:
         elapsed = (time.monotonic() - start) * 1000
         label = f"{name} ({ip})" if name else ip
-        return TestResult("PING", label, False, message=str(e)[:80], duration_ms=elapsed)
+        return TestResult("PING", label, False, message=f"Ping could not run: {type(e).__name__}: {e}"[:500], duration_ms=elapsed)
     finally:
         if proc is not None and proc.returncode is None:
             try:

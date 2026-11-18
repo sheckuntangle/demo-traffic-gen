@@ -24,7 +24,7 @@ WORKER_PORT = 8090
 WORKER_PLAYWRIGHT_VERSION = "1.62.0"
 WORKER_VERSION_LABEL = "org.demo-generator.playwright-version"
 WORKER_PROTOCOL_LABEL = "org.demo-generator.worker-protocol"
-WORKER_PROTOCOL_VERSION = "3"
+WORKER_PROTOCOL_VERSION = "4"
 
 
 @dataclass
