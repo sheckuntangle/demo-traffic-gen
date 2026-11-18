@@ -80,6 +80,15 @@ body { background: #1a1d23; color: #e0e0e0; }
 .report-table thead th { color: #a4afbf; font-weight: 500; }
 .report-table tbody th { font-weight: 500; }
 .report-table tbody tr:hover { background: #212d3e; }
+.report-failure-toggle { border: 0; padding: 0; background: transparent; color: #f85149; text-decoration: underline dotted; text-underline-offset: 4px; font: inherit; cursor: pointer; }
+.report-failure-toggle:hover { color: #ff9a94; }
+.report-failure-toggle:focus-visible { outline: 2px solid #58a6ff; outline-offset: 4px; }
+.report-failure-row td { text-align: left; white-space: normal; background: #111925; }
+.report-failures { margin: 0; padding: 4px 12px 4px 24px; }
+.report-failures li { padding: 10px 4px; overflow-wrap: anywhere; }
+.report-failures li + li { border-top: 1px solid #293547; }
+.report-failures p { margin: 4px 0; white-space: pre-wrap; }
+.report-failures code { color: #e0e0e0; }
 
 .stat-card { }
 .stat-card .pass-count { color: #3fb950; font-size: 1.5rem; font-weight: bold; }

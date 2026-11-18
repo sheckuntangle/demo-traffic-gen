@@ -38,6 +38,33 @@ assert(html.includes('2m 0s'));
 assert(html.includes('&lt;script&gt;evil&lt;/script&gt;'));
 assert(!html.includes('<img'));
 assert(!html.includes('<script>'));
+const section = entry.report.clients[0].sections[0];
+section.failed = 1;
+section.failures = [{test_type: 'WEB', target: '<img src=x>', message: '[expected: block] Status: 200',
+    timestamp: '2026-11-18T20:00:00Z', execution_id: 'abc123', duration_ms: 1250}];
+const expandable = app.renderRunReport(entry);
+assert(expandable.includes('report-failure-toggle'));
+assert(expandable.includes('report-failure-row'));
+assert(!expandable.includes('[expected: block]')); // Failure content is rendered on demand.
+const detail = app.renderReportFailures(section.failures);
+assert(detail.includes('&lt;img src=x&gt;'));
+assert(!detail.includes('<img'));
+assert(detail.includes('[expected: block] Status: 200'));
+assert(detail.includes('abc123'));
+assert(detail.includes('1.3s'));
+const row = {hidden: true, dataset: {}, firstElementChild: {innerHTML: ''}};
+const attrs = {};
+const arrow = {};
+const button = {dataset: {clientIndex: 0, sectionIndex: 0},
+    closest: selector => selector === 'tr' ? {nextElementSibling: row} : {reportData: entry.report},
+    setAttribute: (key, value) => {attrs[key] = value;}, querySelector: () => arrow};
+app.toggleReportFailures(button);
+assert.equal(row.hidden, false);
+assert.equal(attrs['aria-expanded'], 'true');
+assert(row.firstElementChild.innerHTML.includes('abc123'));
+app.toggleReportFailures(button);
+assert.equal(row.hidden, true);
+assert.equal(attrs['aria-expanded'], 'false');
 panel.children = [{innerText: 'Normal log'}, {dataset: {copyText: entry.message}, innerText: 'Collapsed report'}];
 let copied;
 app._fallbackCopy = value => { copied = value; };

@@ -256,6 +256,7 @@ const App = {
 
         if (entry.test_type === "SUMMARY" && entry.report) {
             div.className = "run-report";
+            div.reportData = entry.report;
             div.dataset.copyText = `${this.localLogTimestamp(entry.timestamp)}\n${entry.message}`;
             div.innerHTML = this.renderRunReport(entry);
             container.appendChild(div);
@@ -290,15 +291,18 @@ const App = {
         const totals = report.totals;
         const metric = (label, value, className = "") =>
             `<div class="report-metric ${className}"><strong>${esc(value)}</strong><span>${label}</span></div>`;
-        const clients = report.clients.map(client => {
+        const clients = report.clients.map((client, clientIndex) => {
             const sum = key => client.sections.reduce((total, section) => total + section[key], 0);
-            const rows = client.sections.map(section => `<tr>
+            const rows = client.sections.map((section, sectionIndex) => `<tr>
                 <th scope="row">${esc(section.label)}</th><td>${esc(section.executions)}</td>
                 <td class="log-pass">${esc(section.passed)}</td>
-                <td class="${section.failed ? "log-fail" : "report-muted"}">${esc(section.failed)}</td>
+                <td class="${section.failed ? "log-fail" : "report-muted"}">${section.failures?.length
+                    ? `<button class="report-failure-toggle" aria-expanded="false" aria-label="Show failed test details" data-client-index="${clientIndex}" data-section-index="${sectionIndex}" onclick="App.toggleReportFailures(this)">${esc(section.failed)} <span aria-hidden="true">▸</span></button>`
+                    : esc(section.failed)}</td>
                 <td class="${section.cancelled ? "report-warning" : "report-muted"}">${esc(section.cancelled)}</td>
                 <td class="${section.errors ? "log-fail" : "report-muted"}">${esc(section.errors)}</td>
-                <td>${esc(this.reportDuration(section.seconds))}</td></tr>`).join("");
+                <td>${esc(this.reportDuration(section.seconds))}</td></tr>${section.failures?.length
+                    ? '<tr class="report-failure-row" hidden><td colspan="7"></td></tr>' : ''}`).join("");
             return `<details class="report-client"><summary>
                 <span class="report-client-name">${esc(client.name)}</span>
                 ${client.source_ip !== client.name ? `<span class="report-muted">Source: ${esc(client.source_ip)}</span>` : ""}
@@ -312,8 +316,30 @@ const App = {
             ${metric("Clients", totals.clients)}${metric("Section runs", totals.executions)}
             ${metric("Passed checks", totals.passed, "log-pass")}${metric("Failed checks", totals.failed, totals.failed ? "log-fail" : "")}
             ${metric("Cancelled runs", totals.cancelled, totals.cancelled ? "report-warning" : "")}${metric("Errors", totals.errors, totals.errors ? "log-fail" : "")}
-            </div><p class="report-hint">Select a client to see its test sections.</p>${clients || '<p>No tests started. Check startup errors and the duration versus trigger interval.</p>'}
+            </div><p class="report-hint">Select a client to see its test sections. Select an underlined failure count to inspect failed tests.</p>${clients || '<p>No tests started. Check startup errors and the duration versus trigger interval.</p>'}
             <p class="report-note">${esc(report.note)}</p>`;
+    },
+
+    toggleReportFailures(button) {
+        const row = button.closest("tr").nextElementSibling;
+        const section = button.closest(".run-report").reportData.clients[button.dataset.clientIndex].sections[button.dataset.sectionIndex];
+        if (!row.dataset.rendered) {
+            row.firstElementChild.innerHTML = this.renderReportFailures(section.failures);
+            row.dataset.rendered = "true";
+        }
+        row.hidden = !row.hidden;
+        button.setAttribute("aria-expanded", String(!row.hidden));
+        button.setAttribute("aria-label", row.hidden ? "Show failed test details" : "Hide failed test details");
+        button.querySelector("span").textContent = row.hidden ? "▸" : "▾";
+    },
+
+    renderReportFailures(failures) {
+        const esc = value => this.esc(String(value ?? ""));
+        return `<ol class="report-failures">${failures.map(failure => `<li>
+            <div><strong class="log-fail">${esc(failure.test_type)}</strong> <code>${esc(failure.target)}</code></div>
+            <p>${esc(failure.message || "No error message returned")}</p>
+            <small class="report-muted">${esc(this.localLogTimestamp(failure.timestamp))} · Execution ${esc(failure.execution_id)} · ${esc(this.reportDuration((failure.duration_ms || 0) / 1000))}</small>
+            </li>`).join("")}</ol>`;
     },
 
     reportDuration(seconds) {

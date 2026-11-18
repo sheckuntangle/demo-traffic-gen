@@ -67,6 +67,33 @@ class EngineSummaryTests(unittest.IsolatedAsyncioTestCase):
         await engine._run_category_on_client(client, AppControl())
         self.assertEqual(engine._activity[0]["status"], "error")
         self.assertEqual((engine._activity[0]["passed"], engine._activity[0]["failed"]), (1, 1))
+        engine.log_summary("RUN SUMMARY", "completed")
+        failure = engine._logger.summary.call_args.args[1]["clients"][0]["sections"][0]["failures"][0]
+        self.assertEqual(failure["test_type"], "ERROR")
+        self.assertIn("worker disconnected", failure["message"])
+
+    async def test_summary_retains_all_failures_across_repetitions(self):
+        engine = self.engine()
+        async def run(category, config):
+            results = [TestResult("WEB", f"https://example.com/{index}", False,
+                                  message="[expected: block] Status: 200", duration_ms=1250) for index in range(7)]
+            for result in results:
+                category.emit_result(result)
+            return results
+        client = SimpleNamespace(profile=SimpleNamespace(name="client-50"), run_category=run)
+        await engine._run_category_on_client(client, AppControl())
+        await engine._run_category_on_client(client, AppControl())
+        engine.log_summary("RUN SUMMARY", "completed")
+        report, text = engine._logger.summary.call_args.args[1:]
+        section = report["clients"][0]["sections"][0]
+        self.assertEqual(section["failed"], 14)
+        self.assertEqual(len(section["failures"]), 14)
+        self.assertEqual(len({failure["execution_id"] for failure in section["failures"]}), 2)
+        for failure in section["failures"]:
+            self.assertEqual(failure["duration_ms"], 1250)
+            self.assertTrue(failure["timestamp"].endswith("+00:00"))
+            self.assertIn(failure["target"], text)
+            self.assertIn(failure["message"], text)
 
     async def test_duration_cancels_inflight_work_and_selects_only_requested_loops(self):
         for selected, expected in ((["legitimate"], (True, False)), (["app_control"], (False, True)),

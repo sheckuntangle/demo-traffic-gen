@@ -7,6 +7,7 @@ import traceback
 import time
 import uuid
 from collections import defaultdict
+from datetime import datetime, timezone
 from enum import Enum
 
 from .categories import get_all_categories
@@ -344,8 +345,10 @@ class Engine:
                 self._stats.record(category.name, result.success)
             if activity is not None and result.test_type != "INFO":
                 activity["passed" if result.success else "failed"] += 1
-                if not result.success and len(activity["failures"]) < 5:
-                    activity["failures"].append(f"{result.test_type} {result.target}: {result.message}")
+                if not result.success:
+                    activity["failures"].append({"test_type": result.test_type, "target": result.target,
+                        "message": result.message, "duration_ms": result.duration_ms, "execution_id": activity["id"],
+                        "timestamp": datetime.now(timezone.utc).isoformat(timespec="seconds")})
             self._emit("on_test_complete", result=result)
         return on_result
 
@@ -376,6 +379,9 @@ class Engine:
             activity["status"] = "error"
             activity["failed"] += 1
             error_msg = f"{type(e).__name__}: {e}"
+            activity["failures"].append({"test_type": "ERROR", "target": category.display_name,
+                "message": error_msg, "duration_ms": (time.monotonic() - started) * 1000,
+                "execution_id": activity["id"], "timestamp": datetime.now(timezone.utc).isoformat(timespec="seconds")})
             tb = traceback.format_exc()
             self._logger.log_result(
                 category.name, "ERROR", category.display_name,
@@ -394,8 +400,9 @@ class Engine:
                 f"[{client_name}] {category.display_name}: {activity['status']}; source={source_ip}; "
                 f"execution={activity['id']}; {activity['passed']} passed, {activity['failed']} failed; "
                 f"elapsed={activity['seconds']:.1f}s (phase announcements excluded)")
-            for failure in activity["failures"]:
-                self._logger.info("TEST SUMMARY", f"[{client_name}] execution={activity['id']}; failure: {failure}")
+            for failure in activity["failures"][:5]:
+                self._logger.info("TEST SUMMARY", f"[{client_name}] execution={activity['id']}; "
+                    f"failure: {failure['test_type']} {failure['target']}: {failure['message']}")
 
         self._logger.separator(category.display_name)
 
@@ -421,10 +428,15 @@ class Engine:
             section = {"category": category, "label": categories[category].display_name if category in categories else category,
                        "executions": len(entries), "passed": sum(a['passed'] for a in entries),
                        "failed": sum(a['failed'] for a in entries), "cancelled": sum(a['status'] == 'cancelled' for a in entries),
-                       "errors": sum(a['status'] == 'error' for a in entries), "seconds": round(sum(a['seconds'] for a in entries), 1)}
+                       "errors": sum(a['status'] == 'error' for a in entries), "seconds": round(sum(a['seconds'] for a in entries), 1),
+                       "failures": [failure for activity in entries for failure in activity["failures"]]}
             clients[key]["sections"].append(section)
             text.append(f"{section['label']:<24} {section['executions']:>5} {section['passed']:>6} {section['failed']:>6} "
                         f"{section['cancelled']:>7} {section['errors']:>7} {section['seconds']:>7.1f}s")
+            for failure in section["failures"]:
+                text.append(f"    FAILED {failure['test_type']} | {failure['target']} | {failure['message']}\n"
+                            f"      {failure['timestamp']} | execution={failure['execution_id']} | "
+                            f"elapsed={failure['duration_ms'] / 1000:.2f}s")
         if not groups:
             text.append("No tests started. Check startup errors and the duration versus trigger interval.")
         note = "Pass/fail reflects configured policy expectations. Phase announcements excluded. Time is summed test time; concurrent tests overlap."
