@@ -195,6 +195,31 @@ class SharedRunsTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(entry["report"], report)
         self.assertEqual(entry["message"], "Summary\n3 passed")
 
+    async def test_delete_removes_only_generated_logs_and_logging_continues(self):
+        from demo_generator.web.routes_api import delete_logs
+        self.manager.logger.info("SYSTEM", "Old saved log")
+        log_dir = Path(self.directory.name)
+        archives = [log_dir / "traffic_generator_20260101_120000.log",
+                    log_dir / "traffic_generator_20260101_120000.log.1", log_dir / "web_history.jsonl.1"]
+        for path in archives:
+            path.write_text("old log")
+        unrelated = log_dir / "keep-me.txt"
+        unrelated.write_text("keep me")
+        with patch.object(self.manager, "broadcast") as broadcast:
+            response = await delete_logs(self.request)
+        self.assertEqual(response["status"], "deleted")
+        broadcast.assert_called_once_with({"type": "logs_deleted"})
+        self.assertEqual(self.manager.get_log_history(), [])
+        self.assertTrue(all(not path.exists() for path in archives))
+        self.assertEqual(unrelated.read_text(), "keep me")
+        self.assertEqual(Path(self.manager.logger.log_filename).read_text(), "")
+        self.assertEqual((log_dir / "web_history.jsonl").read_text(), "")
+        self.manager.logger.info("SYSTEM", "New saved log")
+        self.assertIn("New saved log", Path(self.manager.logger.log_filename).read_text())
+        await self.manager.cleanup()
+        self.manager = RunManager(self.config, self.directory.name + "/config.json")
+        self.assertEqual([entry["message"] for entry in self.manager.get_log_history()], ["New saved log"])
+
     async def test_legacy_history_gets_controller_timezone_before_replay(self):
         await self.manager.cleanup()
         path = Path(self.directory.name) / "web_history.jsonl"

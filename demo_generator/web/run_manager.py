@@ -113,6 +113,19 @@ class RunManager:
     def get_log_history(self):
         return list(self._history)
 
+    def delete_logs(self):
+        deleted = self.logger.delete_logs()
+        self.logger.truncate_handler(self._history_handler)
+        backup = self._history_handler.baseFilename + ".1"
+        try:
+            os.unlink(backup)
+            deleted += 1
+        except FileNotFoundError:
+            pass
+        self._history.clear()
+        self.broadcast({"type": "logs_deleted"})
+        return deleted + 1  # Includes the active shared history file.
+
     def _publish_status(self):
         self.broadcast({"type": "status", "data": self.get_status()})
 

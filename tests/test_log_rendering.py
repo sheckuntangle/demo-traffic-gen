@@ -102,7 +102,7 @@ app.appendLog({message: 'no autoscroll'});
 tick();
 assert.equal(layoutReads, readsBefore);
 app.appendLogs(logs);
-app.clearLog();
+app.handleMessage({type: 'logs_deleted'});
 assert.equal(timers.size, 0);
 assert.equal(app.pendingLogs.length, 0);
 assert.equal(panel.children.length, 0);

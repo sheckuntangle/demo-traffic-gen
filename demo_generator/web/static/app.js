@@ -92,6 +92,7 @@ const App = {
         }
         else if (msg.type === "scheduler") this.receiveScheduler(msg.data);
         else if (msg.type === "log") this.appendLog(msg.data);
+        else if (msg.type === "logs_deleted") this.clearLog();
         else if (msg.type === "status") this.updateStatus(msg.data);
         else if (msg.type === "stats") this.updateStats(msg.data);
         else if (msg.type === "round_start") this.updateRound(msg.data.round_num);
@@ -320,9 +321,52 @@ const App = {
         return seconds >= 60 ? `${Math.floor(rounded / 60)}m ${rounded % 60}s` : `${seconds.toFixed(1)}s`;
     },
 
-    copyLog() {
+    logEntryText(entry) {
+        const timestamp = this.localLogTimestamp(entry.timestamp);
+        if (entry.test_type === "SUMMARY") return `${timestamp}\n${entry.message}`;
+        if (entry.test_type === "SEPARATOR") return `──────── ${entry.message || ""} ────────`;
+        const client = entry.client_name ? `[${entry.client_name}] ` : "";
+        return `${timestamp} ${client}${entry.category || ""} | ${entry.target || ""} | ${entry.status || ""} ${entry.message || ""}`;
+    },
+
+    logText() {
         const panel = document.getElementById("log-panel");
-        const text = Array.from(panel.children).map(node => node.dataset?.copyText ?? node.innerText ?? "").join("\n");
+        return [
+            ...Array.from(panel.children).map(node => node.dataset?.copyText ?? node.innerText ?? ""),
+            ...this.pendingLogs.map(entry => this.logEntryText(entry)),
+        ].join("\n");
+    },
+
+    exportLog() {
+        const blob = new Blob([this.logText()], {type: "text/plain;charset=utf-8"});
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.href = url;
+        link.download = `traffic-logs-${new Date().toISOString().replace(/[:.]/g, "-")}.txt`;
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        setTimeout(() => URL.revokeObjectURL(url), 0);
+    },
+
+    async deleteLogs() {
+        if (!confirm("Delete all saved traffic logs and shared log history for everyone? This cannot be undone. New traffic will continue to be logged.")) return;
+        const button = document.getElementById("delete-logs-btn");
+        button.disabled = true;
+        try {
+            const response = await fetch("/api/logs", {method: "DELETE"});
+            const data = await response.json();
+            if (!response.ok) { this.showToast(data.detail || "Could not delete logs"); return; }
+            this.showToast("Saved logs and shared history deleted");
+        } catch (error) {
+            this.showToast(`Could not delete logs: ${error.message}`);
+        } finally {
+            button.disabled = false;
+        }
+    },
+
+    copyLog() {
+        const text = this.logText();
         if (navigator.clipboard && navigator.clipboard.writeText) {
             navigator.clipboard.writeText(text).then(
                 () => this.showToast("Logs copied to clipboard"),

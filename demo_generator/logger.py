@@ -5,6 +5,7 @@ import os
 import re
 from datetime import datetime
 from logging.handlers import RotatingFileHandler
+from pathlib import Path
 
 GREEN = "\033[92m"
 RED = "\033[91m"
@@ -42,6 +43,7 @@ class Logger:
         handler = RotatingFileHandler(log_filename, maxBytes=10 * 1024 * 1024, backupCount=5)
         handler.setFormatter(logging.Formatter("%(message)s"))
         self._file_logger.addHandler(handler)
+        self._handler = handler
 
         self._log_filename = log_filename
 
@@ -51,6 +53,27 @@ class Logger:
 
     def subscribe(self, callback):
         self._callbacks.append(callback)
+
+    @staticmethod
+    def truncate_handler(handler):
+        # Keep the active file open so ongoing runs continue logging after deletion.
+        handler.acquire()
+        try:
+            handler.flush()
+            handler.stream.seek(0)
+            handler.stream.truncate(0)
+        finally:
+            handler.release()
+
+    def delete_logs(self):
+        active = Path(self._log_filename)
+        self.truncate_handler(self._handler)
+        deleted = 1
+        for path in active.parent.iterdir():
+            if path != active and re.fullmatch(r"traffic_generator_\d{8}_\d{6}\.log(?:\.\d+)?", path.name):
+                path.unlink()
+                deleted += 1
+        return deleted
 
     def _emit(self, entry):
         for cb in self._callbacks:

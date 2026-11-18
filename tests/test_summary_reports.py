@@ -46,6 +46,8 @@ assert(copied.includes('Normal log'));
 assert(copied.includes('Hidden client details'));
 assert(copied.includes('App Control 3 9 0'));
 assert(!copied.includes('Collapsed report'));
+app.pendingLogs.push({timestamp: '2026-11-18T20:01:00Z', category: 'legitimate', status: 'PASS', message: 'Pending DNS result'});
+assert(app.logText().includes('Pending DNS result'));
 '''
         subprocess.run(["node", "-e", script], cwd=Path(__file__).resolve().parents[1],
                        check=True, capture_output=True, text=True)

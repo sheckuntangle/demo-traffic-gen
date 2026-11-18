@@ -78,6 +78,15 @@ async def stats(request: Request):
     return manager.get_stats()
 
 
+@router.delete("/logs")
+async def delete_logs(request: Request):
+    try:
+        deleted = request.app.state.manager.delete_logs()
+    except OSError as exc:
+        raise HTTPException(500, f"Could not delete all log files: {exc}")
+    return {"status": "deleted", "files_cleared": deleted}
+
+
 @router.get("/config")
 async def get_config(request: Request):
     manager = request.app.state.manager
