@@ -49,6 +49,8 @@ const App = {
     startTime: null,
     elapsedInterval: null,
     logCount: 0,
+    pendingLogs: [],
+    logRenderTimer: null,
 
     init() {
         this.connectWS();
@@ -82,10 +84,10 @@ const App = {
     handleMessage(msg) {
         if (msg.type === "snapshot") {
             this.clearLog();
-            for (const entry of msg.data.logs) this.appendLog(entry);
             this.updateStatus(msg.data.status);
             this.updateStats(msg.data.stats);
             this.receiveScheduler(msg.data.scheduler);
+            this.appendLogs(msg.data.logs);
         }
         else if (msg.type === "scheduler") this.receiveScheduler(msg.data);
         else if (msg.type === "log") this.appendLog(msg.data);
@@ -195,15 +197,50 @@ const App = {
     // --- Log ---
 
     appendLog(entry) {
+        this.appendLogs([entry]);
+    },
+
+    appendLogs(entries) {
+        this.pendingLogs.push(...entries);
+        // Bound pending work too, if logs arrive faster than the browser renders.
+        if (this.pendingLogs.length > MAX_LOG_LINES) {
+            this.pendingLogs.splice(0, this.pendingLogs.length - MAX_LOG_LINES);
+        }
+        if (this.pendingLogs.length && this.logRenderTimer === null) {
+            this.logRenderTimer = setTimeout(() => this.flushLogs(), 0);
+        }
+    },
+
+    flushLogs() {
+        this.logRenderTimer = null;
         const panel = document.getElementById("log-panel");
+        const fragment = document.createDocumentFragment();
+        for (const entry of this.pendingLogs.splice(0, 100)) {
+            this.renderLogEntry(entry, fragment);
+        }
+        panel.appendChild(fragment);
+        while (this.logCount > MAX_LOG_LINES) {
+            panel.removeChild(panel.firstChild);
+            this.logCount--;
+        }
+        // Read layout once per batch, rather than once per log entry.
+        if (document.getElementById("autoscroll-toggle").checked) {
+            panel.scrollTop = panel.scrollHeight;
+        }
+        if (this.pendingLogs.length) {
+            this.logRenderTimer = setTimeout(() => this.flushLogs(), 0);
+        }
+    },
+
+    renderLogEntry(entry, container) {
         const div = document.createElement("div");
 
         if (entry.test_type === "SEPARATOR") {
             div.className = "log-separator";
             const label = entry.message ? ` ${this.esc(entry.message)} ` : "";
             div.innerHTML = `<span class="text-muted">${"─".repeat(40)}${label}${"─".repeat(Math.max(0, 40 - label.length))}</span>`;
-            panel.appendChild(div);
-            panel.appendChild(document.createElement("br"));
+            container.appendChild(div);
+            container.appendChild(document.createElement("br"));
             this.logCount += 2;
         } else {
             div.className = "log-line";
@@ -216,18 +253,10 @@ const App = {
                 + `${this.esc(entry.target || "")} | `
                 + `<span class="${statusClass}">${this.esc(entry.status || "")}</span> `
                 + this.esc(entry.message || "");
-            panel.appendChild(div);
+            container.appendChild(div);
             this.logCount++;
         }
 
-        while (this.logCount > MAX_LOG_LINES) {
-            panel.removeChild(panel.firstChild);
-            this.logCount--;
-        }
-
-        if (document.getElementById("autoscroll-toggle").checked) {
-            panel.scrollTop = panel.scrollHeight;
-        }
     },
 
     copyLog() {
@@ -259,6 +288,9 @@ const App = {
     },
 
     clearLog() {
+        clearTimeout(this.logRenderTimer);
+        this.logRenderTimer = null;
+        this.pendingLogs = [];
         document.getElementById("log-panel").innerHTML = "";
         this.logCount = 0;
     },
