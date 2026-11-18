@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Firewall Demo Traffic Generator</title>
     <link href="/static/bootstrap.min.css" rel="stylesheet">
-    <link href="/static/style.css?v=12" rel="stylesheet">
+    <link href="/static/style.css?v=13" rel="stylesheet">
 </head>
 <body>
 
@@ -33,11 +33,12 @@
     <div class="tab-content mt-3">
         <!-- Dashboard Tab -->
         <div class="tab-pane show active" id="dashboard-tab">
-            <div class="d-flex flex-column" style="height: calc(100vh - 120px)">
+            <div class="dashboard-layout">
+                <aside class="dashboard-sidebar" aria-label="Traffic controls and test sections">
                 <!-- Controls -->
                 <div class="card mb-2 flex-shrink-0">
                     <div class="card-body d-flex align-items-center gap-3 flex-wrap py-2">
-                        <select id="mode-select" class="form-select" style="width:auto">
+                        <select id="mode-select" class="form-select" aria-label="Run mode">
                             <option value="full">Full Run (legit + periodic triggers)</option>
                             <option value="triggers">Triggers Only (all categories per round)</option>
                             <option value="legit">Legitimate Only (clean traffic)</option>
@@ -50,11 +51,12 @@
 
                 <p class="small text-muted mb-2">Set Runs beside a section’s Run Now button to repeat that section (1–1000 times).</p>
                 <!-- Stats Cards -->
-                <div id="stats-grid" class="row row-cols-3 row-cols-md-5 row-cols-xl-9 g-2 mb-2 flex-shrink-0"></div>
+                <div id="stats-grid" class="row row-cols-2 g-2 mb-2"></div>
+                </aside>
 
                 <!-- Log Panel -->
-                <div class="card flex-grow-1 d-flex flex-column" style="min-height:0">
-                    <div class="card-header d-flex justify-content-between align-items-center flex-shrink-0">
+                <section class="card dashboard-log d-flex flex-column" aria-label="Live traffic log">
+                    <div class="card-header d-flex justify-content-between align-items-center flex-shrink-0 flex-wrap gap-2">
                         <span>Live Log</span>
                         <div class="d-flex gap-2">
                             <div class="form-check form-switch">
@@ -66,7 +68,7 @@
                         </div>
                     </div>
                     <div id="log-panel" class="flex-grow-1"></div>
-                </div>
+                </section>
             </div>
         </div>
 
