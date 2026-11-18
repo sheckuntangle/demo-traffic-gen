@@ -144,7 +144,7 @@ class RunManager:
         self._reserve(mode=RunMode(mode))
         self._run_task = asyncio.create_task(self._execute_run())
 
-    async def _execute_run(self, category=None, scheduled_tests=None):
+    async def _execute_run(self, category=None, scheduled_tests=None, run_count=1):
         try:
             pool = await self._get_active_pool()
             self._engine = Engine(self.config, self.logger, self.stats, pool=pool)
@@ -169,7 +169,10 @@ class RunManager:
                     await self._engine.run_single_category(name, reset_stats=False)
                 self.logger.info("SCHEDULER", "Scheduled tests completed.")
             elif category:
-                await self._engine.run_single_category(category)
+                self.stats.reset_category(category)
+                for index in range(1, run_count + 1):
+                    self.logger.info("SYSTEM", f"Manual run {index}/{run_count}: {category}")
+                    await self._engine.run_single_category(category, reset_stats=False)
             else:
                 await self._engine.start(mode=self._mode)
         except asyncio.CancelledError:
@@ -210,12 +213,14 @@ class RunManager:
             task.cancel()
             await task
 
-    async def run_single(self, category_name):
+    async def run_single(self, category_name, run_count=1):
         from ..categories import get_category
         if get_category(category_name) is None:
             raise ValueError(f"Unknown category: {category_name}")
+        if type(run_count) is not int or not 1 <= run_count <= 1000:
+            raise ValueError("Run count must be a whole number from 1 to 1000")
         self._reserve(category=category_name)
-        self._single_run_task = asyncio.create_task(self._execute_run(category_name))
+        self._single_run_task = asyncio.create_task(self._execute_run(category_name, run_count=run_count))
 
     async def stop_single(self):
         if self._active_category:

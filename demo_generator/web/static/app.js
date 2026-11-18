@@ -49,6 +49,7 @@ const App = {
     startTime: null,
     elapsedInterval: null,
     logCount: 0,
+    dashboardRunCounts: {},
     pendingLogs: [],
     logRenderTimer: null,
 
@@ -127,7 +128,13 @@ const App = {
     },
 
     async runCategory(name) {
-        await this.controlRequest(`/api/run/${name}`);
+        const count = Number(document.getElementById(`run-count-${name}`).value);
+        if (!Number.isInteger(count) || count < 1 || count > 1000) {
+            this.showToast("Run count must be a whole number from 1 to 1000");
+            return;
+        }
+        this.dashboardRunCounts[name] = count;
+        await this.controlRequest(`/api/run/${name}`, {run_count: count});
     },
 
     async stopCategory(name) {
@@ -172,6 +179,9 @@ const App = {
         document.querySelectorAll("[data-stop]").forEach(btn => {
             btn.style.display = data.running && data.category === btn.dataset.stop ? "inline-block" : "none";
             btn.disabled = data.phase === "stopping";
+        });
+        document.querySelectorAll("[data-run-count]").forEach(input => {
+            input.disabled = !!data.running;
         });
         document.getElementById("stop-btn").disabled = !data.running || data.phase === "stopping";
     },
@@ -332,6 +342,10 @@ const App = {
                     <span class="text-muted mx-1">/</span>
                     <span class="fail-count">${s.fail}</span>
                     <div class="total-count small">${total} total</div>
+                    <div class="d-flex justify-content-center align-items-center gap-1 mt-2">
+                        <label class="small" for="run-count-${name}">Runs</label>
+                        <input id="run-count-${name}" data-run-count="${name}" class="form-control form-control-sm" style="width:75px" type="number" min="1" max="1000" step="1" aria-label="${this.esc(display)} run count" value="${this.esc(String(this.dashboardRunCounts[name] ?? 1))}" oninput="App.dashboardRunCounts['${name}'] = this.value">
+                    </div>
                     ${runBtn}
                 </div>
             </div></div>`;

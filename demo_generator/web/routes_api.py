@@ -6,7 +6,7 @@ import logging
 import shutil
 
 from fastapi import APIRouter, HTTPException, Request
-from pydantic import BaseModel
+from pydantic import BaseModel, conint
 
 from .run_manager import RunConflict
 
@@ -19,6 +19,10 @@ docker_router = APIRouter(prefix="/docker")
 
 class StartRequest(BaseModel):
     mode: str = "full"
+
+
+class CategoryRunRequest(BaseModel):
+    run_count: conint(strict=True, ge=1, le=1000) = 1
 
 
 @router.post("/start")
@@ -48,10 +52,10 @@ async def stop_single(request: Request):
 
 
 @router.post("/run/{category_name}")
-async def run_single(category_name: str, request: Request):
+async def run_single(category_name: str, request: Request, data: CategoryRunRequest = None):
     manager = request.app.state.manager
     try:
-        await manager.run_single(category_name)
+        await manager.run_single(category_name, run_count=data.run_count if data else 1)
     except RunConflict as e:
         raise HTTPException(409, str(e))
     except ValueError as e:

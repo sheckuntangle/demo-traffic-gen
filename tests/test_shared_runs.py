@@ -10,7 +10,7 @@ from unittest.mock import AsyncMock, patch
 from fastapi import HTTPException, WebSocketDisconnect
 
 from demo_generator.web.run_manager import RunManager
-from demo_generator.web.routes_api import StartRequest, run_single, start
+from demo_generator.web.routes_api import CategoryRunRequest, StartRequest, run_single, start
 from demo_generator.web.routes_ws import websocket_endpoint
 
 
@@ -78,6 +78,47 @@ class SharedRunsTests(unittest.IsolatedAsyncioTestCase):
             await self.manager._run_task
             self.assertFalse(self.manager.get_status()["running"])
             self.assertIn("startup failed", self.manager.get_log_history()[-1]["message"])
+
+    async def test_manual_repetitions_run_sequentially_without_resetting_stats(self):
+        from unittest.mock import call
+        engine = SimpleNamespace(on=lambda *args: None, run_single_category=AsyncMock(), round_num=0)
+        with patch.object(self.manager, "_get_active_pool", new=AsyncMock()), \
+             patch("demo_generator.web.run_manager.Engine", return_value=engine), \
+             patch.object(self.manager.stats, "reset_category") as reset:
+            await run_single("legitimate", self.request, CategoryRunRequest(run_count=5))
+            with self.assertRaises(HTTPException) as error:
+                await run_single("security", self.request)
+            self.assertEqual(error.exception.status_code, 409)
+            await self.manager._single_run_task
+            self.assertEqual(engine.run_single_category.await_args_list,
+                             [call("legitimate", reset_stats=False)] * 5)
+            reset.assert_called_once_with("legitimate")
+            self.assertFalse(self.manager.get_status()["running"])
+
+    async def test_stop_cancels_remaining_manual_repetitions(self):
+        entered = asyncio.Event()
+        async def run(*args, **kwargs):
+            entered.set()
+            await asyncio.Event().wait()
+        engine = SimpleNamespace(on=lambda *args: None, run_single_category=AsyncMock(side_effect=run),
+                                 request_stop=lambda: None, round_num=0)
+        with patch.object(self.manager, "_get_active_pool", new=AsyncMock()), \
+             patch("demo_generator.web.run_manager.Engine", return_value=engine):
+            await self.manager.run_single("legitimate", run_count=5)
+            await entered.wait()
+            await self.manager.stop()
+            self.assertEqual(engine.run_single_category.await_count, 1)
+            self.assertFalse(self.manager.get_status()["running"])
+
+    async def test_invalid_manual_counts_do_not_reserve_runner(self):
+        from pydantic import ValidationError
+        for count in (0, -1, 1001, True, 2.5, "5"):
+            with self.subTest(count=count):
+                with self.assertRaises(ValidationError):
+                    CategoryRunRequest(run_count=count)
+                with self.assertRaises(ValueError):
+                    await self.manager.run_single("legitimate", run_count=count)
+                self.assertFalse(self.manager.get_status()["running"])
 
     async def test_runner_stays_reserved_until_cleanup_finishes(self):
         cleanup_started = asyncio.Event()
