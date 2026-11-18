@@ -2,7 +2,7 @@ FROM mcr.microsoft.com/playwright/python:v1.62.0-jammy
 
 # Allows the controller to invalidate worker images built before the version pin.
 LABEL org.demo-generator.playwright-version="1.62.0"
-LABEL org.demo-generator.worker-protocol="4"
+LABEL org.demo-generator.worker-protocol="5"
 
 RUN apt-get update -qq && apt-get install -y -qq iputils-ping curl dnsutils openssh-client > /dev/null && rm -rf /var/lib/apt/lists/*
 
