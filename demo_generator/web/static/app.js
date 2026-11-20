@@ -30,10 +30,10 @@ const CATEGORY_SCHEMAS = {
         {key: "targets", label: "IP Targets", fields: ["ip", "description", "expected"]},
     ],
     ip_reputation: [
-        {key: "targets", label: "Malicious IPs", fields: ["ip", "description", "expected", "client_ip"]},
+        {key: "targets", label: "Malicious IPs", fields: ["ip", "client_ip", "description", "expected"]},
     ],
     url_reputation: [
-        {key: "targets", label: "High-Risk URLs", fields: ["url", "description", "expected", "client_ip"]},
+        {key: "targets", label: "High-Risk URLs", fields: ["url", "client_ip", "description", "expected"]},
     ],
 };
 
@@ -715,6 +715,9 @@ const App = {
             } else if (name === "geo_ip") {
                 html += this.renderGeoIpConfig(catConfig);
             } else if (schema) {
+                if (name === "ip_reputation" || name === "url_reputation") {
+                    html += `<p class="text-muted small">Client IP selects the Docker container that sends each target’s traffic. Choose Any for a random client. Repeat a target with different client IPs and expected actions to test different users.${this._dockerEnabled() ? "" : " Enable and save Docker client mode to select a source IP."}</p>`;
+                }
                 for (const section of schema) {
                     const items = catConfig[section.key] || [];
                     html += `<h6>${section.label}</h6>`;
@@ -818,20 +821,28 @@ const App = {
 
     _getDockerClientIps() {
         const docker = this.config.docker || {};
-        if (!docker.enabled || !docker.start_ip || !docker.client_count) return [];
+        if (!docker.start_ip || !/^\d{1,3}(\.\d{1,3}){3}$/.test(docker.start_ip)) return [];
         const parts = docker.start_ip.split(".").map(Number);
-        if (parts.length !== 4) return [];
+        const count = Number(docker.client_count);
+        if (parts.some(part => part > 255) || !Number.isInteger(count) || count < 1) return [];
+        const start = parts.reduce((value, part) => value * 256 + part, 0);
+        if (start + count - 1 > 4294967295) return [];
         const ips = [];
-        for (let i = 0; i < docker.client_count; i++) {
-            ips.push(`${parts[0]}.${parts[1]}.${parts[2]}.${parts[3] + i}`);
+        for (let i = 0; i < count; i++) {
+            const value = start + i;
+            ips.push([24, 16, 8, 0].map(shift => Math.floor(value / 2 ** shift) % 256).join("."));
         }
         return ips;
     },
 
     _clientIpSelect(val) {
         const ips = this._getDockerClientIps();
-        let html = `<select class="form-select form-select-sm" data-field="client_ip">`;
-        html += `<option value="" ${!val ? "selected" : ""}>Any</option>`;
+        let html = `<select class="form-select form-select-sm" data-field="client_ip" aria-label="Source Docker client IP" ${this._dockerEnabled() ? "" : "disabled"}>`;
+        html += `<option value="" ${!val ? "selected" : ""}>Any (random client)</option>`;
+        if (val && !ips.includes(val)) {
+            const safe = this.esc(String(val)).replace(/"/g, "&quot;");
+            html += `<option value="${safe}" selected>Unavailable: ${safe}</option>`;
+        }
         for (const ip of ips) {
             html += `<option value="${ip}" ${val === ip ? "selected" : ""}>${ip}</option>`;
         }
@@ -845,12 +856,11 @@ const App = {
 
     renderTargetTable(catName, sectionKey, fields, items) {
         const tableId = `table-${catName}-${sectionKey.replace(/\./g, '-')}`;
-        const showClientIp = this._dockerEnabled();
-        const activeFields = showClientIp ? fields : fields.filter(f => f !== "client_ip");
+        const activeFields = fields;
 
         let html = `<table class="table table-sm target-table mb-2" id="${tableId}">
             <thead><tr>`;
-        for (const f of activeFields) html += `<th>${f === "client_ip" ? "client IP" : f}</th>`;
+        for (const f of activeFields) html += `<th>${f === "client_ip" ? "Client IP" : f}</th>`;
         html += `<th></th></tr></thead><tbody>`;
 
         for (let i = 0; i < items.length; i++) {
@@ -874,8 +884,7 @@ const App = {
     },
 
     addRow(tableId, fields) {
-        const showClientIp = this._dockerEnabled();
-        const activeFields = showClientIp ? fields : fields.filter(f => f !== "client_ip");
+        const activeFields = fields;
         const tbody = document.querySelector(`#${tableId} tbody`);
         let tr = document.createElement("tr");
         for (const f of activeFields) {

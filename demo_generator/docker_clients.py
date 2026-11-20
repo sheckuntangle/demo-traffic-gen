@@ -3,6 +3,7 @@
 import asyncio
 import logging
 import json
+from ipaddress import IPv4Address
 import random
 import time
 from dataclasses import dataclass
@@ -218,10 +219,8 @@ class DockerClientPool:
 
     @staticmethod
     def _generate_ips(start_ip, count):
-        parts = start_ip.split(".")
-        base = ".".join(parts[:3])
-        last = int(parts[3])
-        return [f"{base}.{last + i}" for i in range(count)]
+        start = IPv4Address(start_ip)
+        return [str(start + i) for i in range(count)]
 
     async def start(self):
         if self.is_started:

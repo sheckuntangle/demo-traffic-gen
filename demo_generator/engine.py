@@ -277,6 +277,10 @@ class Engine:
             if hasattr(c, "macvlan_ip") and c.macvlan_ip:
                 client_by_ip[c.macvlan_ip] = c
 
+        # Validate every section before creating tasks, avoiding partial dispatch.
+        for category in cats:
+            self._validate_client_ip_assignments(category, client_by_ip)
+
         tasks = []
         for category in cats:
             dispatched = self._dispatch_by_client_ip(
@@ -300,13 +304,15 @@ class Engine:
                     self._active_tasks.remove(t)
 
     def _dispatch_by_client_ip(self, category, clients, client_by_ip):
-        if category.name not in CATEGORIES_WITH_CLIENT_IP or not client_by_ip:
+        if category.name not in CATEGORIES_WITH_CLIENT_IP:
             return None
         cat_config = self._config.get("categories", {}).get(category.name, {})
         targets = cat_config.get("targets", [])
         has_client_ip = any(t.get("client_ip") for t in targets)
         if not has_client_ip:
             return None
+
+        self._validate_client_ip_assignments(category, client_by_ip)
 
         groups = {}
         for target in targets:
@@ -315,7 +321,7 @@ class Engine:
 
         tasks = []
         for ip, group_targets in groups.items():
-            if ip and ip in client_by_ip:
+            if ip:
                 client = client_by_ip[ip]
             else:
                 client = random.choice(clients)
@@ -326,6 +332,17 @@ class Engine:
                 self._run_category_on_client(
                     client, cat_instance, config_override=config_copy)))
         return tasks
+
+    def _validate_client_ip_assignments(self, category, client_by_ip):
+        if category.name not in CATEGORIES_WITH_CLIENT_IP:
+            return
+        targets = self._config.get("categories", {}).get(category.name, {}).get("targets", [])
+        unavailable = sorted({target["client_ip"] for target in targets
+                              if target.get("client_ip") and target["client_ip"] not in client_by_ip})
+        if unavailable:
+            raise ValueError(f"{category.display_name}: assigned client IP(s) {', '.join(unavailable)} unavailable. "
+                             "Enable Docker client mode and check the configured starting IP and client count. "
+                             "No targets in this section were dispatched.")
 
     def _make_result_callback(self, category, client_name, activity=None):
         def on_result(result):
