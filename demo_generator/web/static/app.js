@@ -376,16 +376,32 @@ const App = {
     },
 
     async deleteLogs() {
-        if (!confirm("Delete all saved traffic logs and shared log history for everyone? This cannot be undone. New traffic will continue to be logged.")) return;
+        if (!confirm("Delete all saved traffic logs and shared log history, and clear dashboard counters for everyone? This cannot be undone. New traffic will continue to be logged and counted.")) return;
         const button = document.getElementById("delete-logs-btn");
         button.disabled = true;
         try {
             const response = await fetch("/api/logs", {method: "DELETE"});
             const data = await response.json();
             if (!response.ok) { this.showToast(data.detail || "Could not delete logs"); return; }
-            this.showToast("Saved logs and shared history deleted");
+            this.showToast("Saved logs deleted and dashboard counters cleared");
         } catch (error) {
             this.showToast(`Could not delete logs: ${error.message}`);
+        } finally {
+            button.disabled = false;
+        }
+    },
+
+    async clearCounters() {
+        const button = document.getElementById("clear-counters-btn");
+        button.disabled = true;
+        try {
+            const response = await fetch("/api/stats/reset", {method: "POST"});
+            const data = await response.json();
+            if (!response.ok) { this.showToast(data.detail || "Could not clear counters"); return; }
+            if (this.ws?.readyState !== 1) this.updateStats(data);
+            this.showToast("Dashboard counters cleared for everyone");
+        } catch (error) {
+            this.showToast(`Could not clear counters: ${error.message}`);
         } finally {
             button.disabled = false;
         }

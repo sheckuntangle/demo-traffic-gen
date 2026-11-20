@@ -124,7 +124,14 @@ class RunManager:
             pass
         self._history.clear()
         self.broadcast({"type": "logs_deleted"})
+        self.clear_counters()
         return deleted + 1  # Includes the active shared history file.
+
+    def clear_counters(self):
+        self.stats.clear_counters()
+        stats = self.get_stats()
+        self.broadcast({"type": "stats", "data": stats})
+        return stats
 
     def _publish_status(self):
         self.broadcast({"type": "status", "data": self.get_status()})

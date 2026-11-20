@@ -45,6 +45,7 @@
                         </select>
                         <button id="start-btn" class="btn btn-success" onclick="App.start()">Start</button>
                         <button id="stop-btn" class="btn btn-danger" onclick="App.stop()" disabled>Stop</button>
+                        <button id="clear-counters-btn" class="btn btn-outline-light btn-sm" onclick="App.clearCounters()" title="Reset pass/fail counters for everyone; running tests continue">Clear Counters</button>
                         <span id="mode-info" class="text-muted small"></span>
                     </div>
                 </div>
@@ -66,7 +67,7 @@
                             <button class="btn btn-sm btn-outline-light" onclick="App.copyLog()">Copy</button>
                             <button class="btn btn-sm btn-outline-light" onclick="App.exportLog()" title="Download the current log window, including full summaries">Export to Text</button>
                             <button class="btn btn-sm btn-outline-light" onclick="App.clearLog()">Clear View</button>
-                            <button id="delete-logs-btn" class="btn btn-sm btn-outline-danger" onclick="App.deleteLogs()" title="Delete saved traffic logs and shared history for all browsers">Delete Logs</button>
+                            <button id="delete-logs-btn" class="btn btn-sm btn-outline-danger" onclick="App.deleteLogs()" title="Delete saved traffic logs and shared history, and clear counters for all browsers">Delete Logs</button>
                         </div>
                     </div>
                     <div id="log-panel" class="flex-grow-1"></div>
@@ -200,6 +201,6 @@
 </div>
 
 <script src="/static/bootstrap.bundle.min.js"></script>
-<script src="/static/app.js?v=21"></script>
+<script src="/static/app.js?v=22"></script>
 </body>
 </html>

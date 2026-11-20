@@ -198,6 +198,8 @@ class SharedRunsTests(unittest.IsolatedAsyncioTestCase):
     async def test_delete_removes_only_generated_logs_and_logging_continues(self):
         from demo_generator.web.routes_api import delete_logs
         self.manager.logger.info("SYSTEM", "Old saved log")
+        self.manager.stats.record("app_control", True)
+        self.manager.stats.record("legitimate", False)
         log_dir = Path(self.directory.name)
         archives = [log_dir / "traffic_generator_20260101_120000.log",
                     log_dir / "traffic_generator_20260101_120000.log.1", log_dir / "web_history.jsonl.1"]
@@ -208,7 +210,11 @@ class SharedRunsTests(unittest.IsolatedAsyncioTestCase):
         with patch.object(self.manager, "broadcast") as broadcast:
             response = await delete_logs(self.request)
         self.assertEqual(response["status"], "deleted")
-        broadcast.assert_called_once_with({"type": "logs_deleted"})
+        self.assertEqual(broadcast.call_count, 2)
+        self.assertEqual(broadcast.call_args_list[0].args[0], {"type": "logs_deleted"})
+        self.assertEqual(broadcast.call_args_list[1].args[0], {"type": "stats", "data": self.manager.get_stats()})
+        self.assertEqual(self.manager.get_stats()["total_pass"], 0)
+        self.assertEqual(self.manager.get_stats()["total_fail"], 0)
         self.assertEqual(self.manager.get_log_history(), [])
         self.assertTrue(all(not path.exists() for path in archives))
         self.assertEqual(unrelated.read_text(), "keep me")
@@ -219,6 +225,28 @@ class SharedRunsTests(unittest.IsolatedAsyncioTestCase):
         await self.manager.cleanup()
         self.manager = RunManager(self.config, self.directory.name + "/config.json")
         self.assertEqual([entry["message"] for entry in self.manager.get_log_history()], ["New saved log"])
+
+    async def test_clear_counters_preserves_logs_and_running_state_and_broadcasts(self):
+        from demo_generator.web.routes_api import clear_counters
+        self.manager.logger.info("SYSTEM", "Preserved log")
+        self.manager.stats.record("app_control", True)
+        self.manager.stats.finish_round()
+        self.manager.stats.record("legitimate", False)
+        self.manager._phase = "running"
+        with patch.object(self.manager, "broadcast") as broadcast:
+            result = await clear_counters(self.request)
+        self.assertEqual(result["total_pass"], 0)
+        self.assertEqual(result["total_fail"], 0)
+        self.assertEqual(result["categories"], {})
+        self.assertEqual(result["total_rounds"], 1)
+        self.assertEqual(self.manager.stats.get_round_summary()["total_fail"], 0)
+        self.assertEqual(self.manager._phase, "running")
+        broadcast.assert_called_once_with({"type": "stats", "data": result})
+        self.assertEqual(self.manager.get_log_history()[-1]["message"], "Preserved log")
+        self.assertIn("Preserved log", Path(self.manager.logger.log_filename).read_text())
+        self.manager.stats.record("legitimate", True)
+        self.assertEqual(self.manager.get_stats()["total_pass"], 1)
+        self.manager._phase = "idle"
 
     async def test_legacy_history_gets_controller_timezone_before_replay(self):
         await self.manager.cleanup()

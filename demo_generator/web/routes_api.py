@@ -87,6 +87,11 @@ async def delete_logs(request: Request):
     return {"status": "deleted", "files_cleared": deleted}
 
 
+@router.post("/stats/reset")
+async def clear_counters(request: Request):
+    return request.app.state.manager.clear_counters()
+
+
 @router.get("/config")
 async def get_config(request: Request):
     manager = request.app.state.manager

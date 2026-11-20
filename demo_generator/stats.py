@@ -39,6 +39,12 @@ class Stats:
             self._cumulative[category] = {"pass": 0, "fail": 0}
             self._round_stats[category] = {"pass": 0, "fail": 0}
 
+    def clear_counters(self):
+        """Reset check counts without changing the running engine or round number."""
+        with self._lock:
+            self._round_stats.clear()
+            self._cumulative.clear()
+
     def get_round_summary(self):
         with self._lock:
             return self._get_round_summary_unlocked()
